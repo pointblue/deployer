@@ -27,6 +27,9 @@ task('deploy:update_autoload_classmap', function(){
 });
 
 //things we want all laravel apps to do after they're done building, but before release
+//
+// just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
+//
 task('deploy:pb_deployer_laravel_post_hook', [
     'deploy:update_autoload_classmap'
 ]);
