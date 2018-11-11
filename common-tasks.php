@@ -26,16 +26,8 @@ task('deploy:update_autoload_classmap', function(){
     run("sed -i -r 's/$find/$replace/g' $classmap_file");
 });
 
-//things we want all laravel apps to do after they're done building, but before release
-//
-// just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
-//
-task('deploy:pb_deployer_laravel_post_hook', [
-    'deploy:update_autoload_classmap'
-]);
 
-
-//force the user to have the latest version the to continue
+//force the user to have the latest version to continue
 task('deploy:info', function(){
 
     //get all the package names
@@ -56,3 +48,36 @@ task('deploy:info', function(){
     }
 
 });
+
+/**
+ *
+ * If the env_symlinks env variable is set (in deployer), a symlink will be created for each target/destination pair
+ * This allows deployments to define where their own environment configs are per server
+ *
+ */
+task('deploy:symlink_envs', function(){
+
+    $envSymlinks = has('env_symlinks') ?  get('env_symlinks') : [];
+
+    //create a symlink for each target / destination pair
+    foreach($envSymlinks as $envSymlink){
+        run("{{bin/symlink}} {$envSymlink['target']} {$envSymlink['destination']}");
+    }
+
+});
+
+
+//things we want all laravel apps to do after they're done building, but before release
+//
+// just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
+//
+task('deploy:pb_deployer_post_hook_laravel', [
+    'deploy:update_autoload_classmap',
+]);
+
+/**
+ * Tasks we want to do every time for all deployments
+ */
+task('deploy:pb_deployer_post_hook', [
+    'deploy:symlink_envs'
+]);
