@@ -38,16 +38,20 @@ task('deploy:pb_deployer_laravel_post_hook', [
 //force the user to have the latest version the to continue
 task('deploy:info', function(){
 
-    $result = (string)runLocally('composer global show -ol | grep -oP "pointblue/deployer (\d|\.)+ . (\d|\.)+"');
-    $versionInfo = explode(' ', $result);
+    //get all the package names
+    $packages = run('composer global show -l')->toString();
 
-    //in case the version message is change we'll know when it breaks
-    if(count($versionInfo) !== 4){
-        throw new \Exception('Point Blue deployer tasks could not parse version string: ' . $result);
+    //find our package in the list and pull out the relevant version parts
+    $versionInfo = [];
+    preg_match('/pointblue\/deployer ([\d\.]+) = ([\d\.]+)/', 'pointblue/deployer 1.2.3 = 1.2.3 Deployer tasks for Point Blue apps', $matches);
+
+    // if we see out app name, but the other parts in the version message changed we'll know how it broke
+    if( preg_match('/pointblue\/deployer/', $packages) && count($versionInfo) !== 3 ){
+        throw new \Exception('Point Blue deployer tasks could not parse version string: ' . $packages);
     }
 
     //force users to update if their deploy tasks are old. this will ensure deploys are always made the same way
-    if($versionInfo[3] > $versionInfo[1]){
+    if($versionInfo[2] > $versionInfo[1]){
         throw new \Exception('Point Blue deployer tasks outdated. Run: composer global update pointblue/deployer');
     }
 
