@@ -1,0 +1,13 @@
+{
+    "name": "pointblue/deployer",
+    "description": "Deployer tasks for Point Blue apps",
+    "authors": [
+        {
+            "name": "Point Blue",
+            "email": "datasolutions@pointblue.org"
+        }
+    ],
+    "require": {
+        "php":"^5.6"
+    }
+}
