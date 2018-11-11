@@ -43,7 +43,7 @@ task('deploy:info', function(){
 
     //find our package in the list and pull out the relevant version parts
     $versionInfo = [];
-    preg_match('/pointblue\/deployer ([\d\.]+) = ([\d\.]+)/', 'pointblue/deployer 1.2.3 = 1.2.3 Deployer tasks for Point Blue apps', $matches);
+    preg_match('/pointblue\/deployer ([\d\.]+) . ([\d\.]+)/', $packages, $versionInfo);
 
     // if we see out app name, but the other parts in the version message changed we'll know how it broke
     if( preg_match('/pointblue\/deployer/', $packages) && count($versionInfo) !== 3 ){
