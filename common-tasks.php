@@ -25,3 +25,8 @@ task('deploy:update_autoload_classmap', function(){
     //replace command
     run("sed -i -r 's/$find/$replace/g' $classmap_file");
 });
+
+//things we want all laravel apps to do after they're done building, but before release
+task('deploy:pb_deployer_laravel_post_hook', [
+    'deploy:update_autoload_classmap'
+]);
