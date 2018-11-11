@@ -33,3 +33,15 @@ task('deploy:update_autoload_classmap', function(){
 task('deploy:pb_deployer_laravel_post_hook', [
     'deploy:update_autoload_classmap'
 ]);
+
+
+//force the user to have the latest version the to continue
+task('deploy:info', function(){
+
+    $versionString = (string)run('composer global show -l | grep -oP "pointblue/deployer ([\d\.]+) = ([\d\.]+)"');
+    $versionParts = explode(' ', $versionString);
+    if($versionParts[3] > $versionParts[1]){
+        throw new \Exception('Point Blue deployer tasks outdated. Run: composer global update pointblue/deployer');
+    }
+
+});
