@@ -27,7 +27,11 @@ task('deploy:update_autoload_classmap', function(){
 });
 
 
-//force the user to have the latest version to continue
+/**
+ *
+ * force the user to update this package if it's old before proceeding
+ *
+ */
 task('deploy:info', function(){
 
     //get all the package names
@@ -67,16 +71,19 @@ task('deploy:symlink_envs', function(){
 });
 
 
-//things we want all laravel apps to do after they're done building, but before release
-//
-// just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
-//
+/**
+ *
+ * things we want all laravel apps to do after they're done building, but before release
+ *
+ * just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
+ *
+ */
 task('deploy:pb_deployer_post_hook_laravel', [
     'deploy:update_autoload_classmap',
 ]);
 
 /**
- * Tasks we want to do every time for all deployments
+ * Tasks we want to do every time for all app deployments
  */
 task('deploy:pb_deployer_post_hook', [
     'deploy:symlink_envs'
