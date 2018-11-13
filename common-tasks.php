@@ -57,7 +57,7 @@ task('deploy:version_check', function(){
 });
 
 //run after deploy:info to be sure it happens at the very beginning
-after('deploy:version_check', 'deploy:info');
+after('deploy:prepare', 'deploy:version_check');
 
 /**
  *
