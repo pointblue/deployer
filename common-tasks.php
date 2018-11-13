@@ -29,10 +29,13 @@ task('deploy:update_autoload_classmap', function(){
 
 /**
  *
+ * deploy:version_check
+ *
  * force the user to update this package if it's old before proceeding
  *
  */
-task('deploy:info', function(){
+desc('Ensure the latest version of pointblue/deployer is being used');
+task('deploy:version_check', function(){
 
     //get all the package names
     $packages = run('composer global show -l')->toString();
@@ -53,12 +56,36 @@ task('deploy:info', function(){
 
 });
 
+//run after deploy:info to be sure it happens at the very beginning
+after('deploy:version_check', 'deploy:info');
+
 /**
  *
+ * deploy:symlink_envs
+ *
  * If the env_symlinks env variable is set (in deployer), a symlink will be created for each target/destination pair
- * This allows deployments to define where their own environment configs are per server
+ * in the array. This allows deployments to define where their own environment configs are per server.
+ *
+ * Be sure to use `set('use_relative_symlink', false);` in your deployer script! If not, the symlink will point to the
+ * release version of the destination file, not the current version.
+ *
+ * Example in servers.yml:
+ *
+ *   myhost:
+ *     user: ubuntu
+ *     pem_file: ~/.ssh/pem.pem
+ *     host: example.org
+ *     stage: production
+ *     deploy_path: /my/deploy/path
+ *     branch: master
+ *     env_symlinks: #link configs in shared_files to actual configs
+ *       - target: "{{deploy_path}}/../environment_configs/current/aws/deju2/apps_all/build/conf/apps_all-conf-prod.php"
+ *         destination: "{{deploy_path}}/shared/lib/db/apps_all/build/conf/apps_all-conf-prod.php"
+ *       - target: "{{deploy_path}}/../environment_configs/current/aws/deju2/auth/build/conf/auth-conf-prod.php"
+ *         destination: "{{deploy_path}}/shared/lib/db/auth/build/conf/auth-conf-prod.php"
  *
  */
+desc('Symlink target/destination pair in env_symlinks array');
 task('deploy:symlink_envs', function(){
 
     $envSymlinks = has('env_symlinks') ?  get('env_symlinks') : [];
