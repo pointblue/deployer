@@ -128,6 +128,27 @@ task('deploy:symlink_envs', function(){
 
 });
 
+desc('Log pull request information for deployment if available');
+task('deploy:log_pull_request', function(){
+        $prId = input()->getOption('pr-id');
+        writeln($prId);
+        if( $prId ){
+        if(file_exists("/tmp/pr_{$prId}.json")){
+                writeln('found file');
+                $json = file_get_contents("/tmp/pr_{$prId}.json");
+                $prEvent = json_decode($json);
+                $content = "<p>" . date(DATE_W3C) . ' - ' . $prEvent->repository->full_name . ' - ' . '<a href="' . $prEvent->pull_request->html_url . '">' . $prEvent->pull_request->html_url . '</a></p>' . "\n";
+                writeln($content);
+                //TODO: Make the output file path variable
+                file_put_contents("/var/www/html/webhooks/git.html", $content, FILE_APPEND);
+                //TODO: Add Slack webhook here
+        }
+
+        }
+
+});
+
+
 
 /**
  *
