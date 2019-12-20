@@ -65,7 +65,7 @@ task('deploy:update_autoload_classmap', function(){
         $replace = "\\1\/current";
 
         //composer classmap file for this release
-        $classmap_file = get("deploy_path") . "/current/$appPath/vendor/composer/autoload_classmap.php";
+        $classmap_file = get("release_path") . "/$appPath/vendor/composer/autoload_classmap.php";
 
         $replaceCommand = "sed -i -r 's/$find/$replace/g' $classmap_file";
 
