@@ -117,22 +117,6 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
-//Install node_modules defined in yarn.lock
-desc('Install node modules (npm/yarn)');
-task('deploy:node_modules', function () {
-    run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
-});
-
-//use yarn to run the 'prod' script with should be define in the package.json of the repo in the "scripts" property
-// this command should run any tasks that compile assets such as js, cs, sass, and so on.
-desc("build runtime assets (css, js, etc)");
-task('deploy:build_assets', function(){
-    run("cd {{release_path}} && yarn run prod");
-});
-
-
-
-
 
 /**
  *
@@ -145,6 +129,25 @@ task('deploy:build_assets', function(){
  */
 
 
+//Install node_modules defined in yarn.lock
+desc('Install node modules (npm/yarn)');
+task('deploy:node_modules', function () {
+    run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
+});
+
+//use yarn to run the 'prod' script with should be define in the package.json of the repo in the "scripts" property
+// this command should run any tasks that compile assets such as js, cs, sass, and so on.
+desc("Install bower components");
+task('deploy:bower_components', function(){
+    run("cd {{release_path}} && {{bin/bower}} install");
+});
+
+//use yarn to run the 'prod' script with should be define in the package.json of the repo in the "scripts" property
+// this command should run any tasks that compile assets such as js, cs, sass, and so on.
+desc("build runtime assets (css, js, etc)");
+task('deploy:build_assets', function(){
+    run("cd {{release_path}} && yarn run prod");
+});
 
 
 
