@@ -25,9 +25,6 @@ set('default_stage', 'nonprod-aws');
 set('ssh_type', 'native');
 set('ssh_multiplexing', true);
 
-//the filename of the metadata output for this build. path defaults to project root or `public` folder if available
-set('build_meta_output', 'deployer_php_build.json');
-
 //using relative links will turn /myapp/current into /myapp/releases/1, which is saved in some cases causing stale
 // references when the release of a dependency changes
 set('use_relative_symlink', false);
@@ -35,9 +32,30 @@ set('use_relative_symlink', false);
 //log all actions to a local file
 set('log_file', 'deployer_php_build.log');
 
+/**
+ *
+ *
+ * Configuration: Point Blue specific
+ *
+ *
+ * These variables are not part of deployer, but are required by the additional tasks created in this library
+ *
+ *
+ */
+
+//the filename of the metadata output for this build. path defaults to project root or `public` folder if available
+set('build_meta_output', 'deployer_php_build.json');
+
+//create this with an empty array to be sure that our function which expecting `common_symlinks` to be set
+set('common_symlinks', []);
+
 
 /**
+ *
+ *
  * Options that can be used in the command line
+ *
+ *
  */
 option('pb-test', null, InputOption::VALUE_NONE, 'Have a Point Blue task print to console instead of executing');
 
@@ -459,6 +477,123 @@ task('deploy:symlink_envs', function(){
 
 });
 
+/**
+ *
+ *
+ * #deploy:common_symlinks
+ *
+ *
+ * This creates symlinks for common libraries that are necessary for composer to resolve all of it's dependencies. This
+ * is for libraries that are shared between apps and are deployed in a single location. The main libraries this is meant
+ * to support are:
+ *
+ *   - deju2
+ *   - deju2-renew
+ *   - deju3
+ *
+ * To do this, you must add a configuration to your deploy.php as:
+ *
+ * set('common_symlinks', [
+ *    "base_path" => "{{deploy_path}}/apps/common",
+ *    "libs" => [
+ *     "deju2",
+ *     "deju2-renew",
+ *     "deju3"
+ *   ]
+ * ]);
+ *
+ * Where the `base_path` property is the path where your symlinks will go and the `libs` property is an array of library
+ * names where each library is a deployed repo that will be symlinked. The library must be defined in the $libNames
+ * array of this task.
+ *
+ * Example:
+ *
+ * You have a composer.json file with deju autoload dependencies:
+ *
+ *     "autoload-dev": {
+ *       "classmap": [
+ *         "../../apps/common/deju2-renew/lib/db/nodedb/build/classes/nodedb/",
+ *         "../../apps/common/deju2-renew/lib/deju/",
+ *         "../../apps/common/deju2-renew/Deju2.php",
+ *         "../../apps/common/deju3/vendor/propel/propel1/runtime/lib/Propel.php"
+ *        ],
+ *        ...
+ *
+ * This means that from the app's release path, it's going to try and resolve those dependencies.
+ * If your app is deployed at `/path/to/deploy/my-app/releases/22` then composer will try to find the files at:
+ * `/path/to/deploy/my-app/apps/common/deju2-renew/Deju2.php` for example. This doesn't work because our dependencies
+ * aren't at that location. To fix it, we add a symlink at that location which **will** resolve to the correct
+ * location, which is what the deploy:common_symlinks task does.
+ *
+ *
+ *
+ */
+desc('Create symlinks to point blue dependencies in composer.json');
+task('deploy:common_symlinks', function(){
+
+    //Note: I use the term 'library' here because this was originally intended for the deju libraries. Library can also
+    // be thought of as any git repo that is a dependency and needs to be symlinked for this deployment to resolve a
+    // path to it
+
+    //This maps a library name to the name of a symlink that will be create for it
+    // each key is a library name
+    // each value is an associate array with two properties: link_name and current_release_path
+    //   link_name is the name of the symbolic link that will be created
+    //   current_release_path is the path to the current release of the library
+    $libNames = [
+        "deju2" => [
+            "link_name" => 'deju2',
+            "current_release_path" => "{{deploy_path}}/../deju2/current"
+        ],
+        "deju2-renew" => [
+            "link_name" => 'deju2-renew',
+            "current_release_path" => "{{deploy_path}}/../deju2-renew/current"
+        ],
+        "deju3" => [
+            "link_name" => 'deju3',
+            "current_release_path" => "{{deploy_path}}/../deju3/current"
+        ],
+        "apps-authentication-common" => [
+            "link_name" => 'authentication',
+            "current_release_path" => "{{deploy_path}}/../apps-authentication-common/current"
+        ]
+    ];
+
+    $commonSymlinks = get('common_symlinks');
+
+    //common_symlinks is an empty array by default. check if the necessary properties are available to run the function.
+    if(!array_key_exists('base_path', $commonSymlinks) || !array_key_exists('libs', $commonSymlinks))
+    {
+        return;
+    }
+
+    $basePath = $commonSymlinks['base_path'];
+    $libs = $commonSymlinks['libs'];
+
+    //create the path where the symlinks will go
+    run("mkdir -p {$basePath}");
+
+    //create a symlink for each lib in the libs array
+    for($i=0;$i<count($libs);$i++)
+    {
+        $lib = $libs[$i];
+        if(!array_key_exists($lib, $libNames))
+        {
+            throw new \Exception('The lib defined in common_symlinks->libs is not known to deploy:common_symlinks. ' .
+                'Search $libNames in the pointblue/deployer repo for more information.');
+        }
+
+        //first argument is where the link will point to
+        $currentReleasePath = $libNames[$lib]['current_release_path'];
+
+        //second argument is the name of the link that will be created
+        $linkName = $libNames[$lib]['link_name'];
+
+        run("cd {$basePath} && {{bin/symlink}} {$currentReleasePath} {$linkName}");
+    }
+
+});
+
 
 /**
  *
@@ -487,3 +622,6 @@ task('deploy:pb_deployer_post_hook', [
     'deploy:update_autoload_classmap',
     'deploy:build_metadata'
 ]);
+
+//before running the composer install command, create the symlinks that will be needed, if any
+before('deploy:vendors', 'deploy:common_symlinks');
