@@ -210,20 +210,40 @@ task('deploy:build_metadata', function (){
 
     $gitRevUrl = get('git_rev_url');
 
+    //the default build details
     $buildDetails = [
-        "git_rev" => $rev,
-        "git_rev_url" => escapeshellarg($gitRevUrl),
-        "git_tag" => $tag,
-        "git_branch" => $branch,
+        //time the build finishes (if this task is run last)
         "timestamp" => $timestamp,
-        "deployer_php_release" => get('release_name')
+        //current branch of the deployed repo
+        "git_branch" => $branch,
+        //current tag of the deployed repo
+        "git_tag" => $tag,
+        //current revision of the deployed repo
+        "git_rev" => $rev,
+        //github link to the deployed revision
+        // useful to see the exact code that is currently deployed
+        "git_rev_url" => escapeshellarg($gitRevUrl)
     ];
 
-    //add pull request urls if this is the dev branch, for convenience
-    if( $branch === 'dev' )
+    //add compare urls if this is not the master branch for convenience
+    //we assume that this is useful only for branches other than master
+    if( $branch !== 'master' )
     {
-        $buildDetails['git_rev_pr_url'] = escapeshellarg("{$repoUrl}/compare/master...{$rev}");
-        $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/master...dev");
+        //the dev branch compares to the master branch and everything else compares to the dev branch
+        $compareBase = $branch === 'dev' ? 'master' : 'dev';
+
+        //compare the current revision to the base branch
+        // useful if the dev has changed since deployment
+        $buildDetails['git_rev_compare_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$rev}");
+        //compare the current branch to the base branch
+        // useful for creating the most common pull requests
+        $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
+        //compare the current tag against the base branch
+        // useful to create a pr for a specific version you've tested
+        // useful to create a pr then continue developing on the same branch without changing the diff of the pr
+        // (which would happen if you did a branch pr and then later pushed more commits to the compared branch before
+        // its merged)
+        $buildDetails['git_tag_pr_url'] = ! empty($tag) ? escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$tag}") : '';
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
@@ -231,6 +251,9 @@ task('deploy:build_metadata', function (){
     {
         $buildDetails['launch_url'] = escapeshellarg($launchUrl);
     }
+
+    //always show the release name from deployer php, but add it last
+    $buildDetails['deployer_php_release'] = get('release_name');
 
     //content to add to the build document
     $content = json_encode($buildDetails);
