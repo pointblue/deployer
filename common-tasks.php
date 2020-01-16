@@ -597,6 +597,25 @@ task('deploy:common_symlinks', function(){
 
 /**
  *
+ *
+ *
+ *
+ * TASK ORDER
+ *
+ *
+ * Configure the order that our custom tasks will run in
+ *
+ *
+ *
+ */
+
+
+
+
+
+
+/**
+ *
  * things we want all laravel apps to do after they're done building, but before release
  *
  * just add this to you project's deploy.php: after('artisan:optimize', 'deploy:pb_deployer_laravel_post_hook');
@@ -625,3 +644,22 @@ task('deploy:pb_deployer_post_hook', [
 
 //before running the composer install command, create the symlinks that will be needed, if any
 before('deploy:vendors', 'deploy:common_symlinks');
+
+/**
+ *
+ * deploy:pb_deployer_post_hook task order
+ *
+ * the hook is added after two tasks- artisan:optimize and deploy:clear_paths
+ * this works because we assume that a deployment will only include one or the other, not both.
+ *
+ *
+ */
+
+//the artisan:optimize task is only executed from the laravel recipe.
+after('artisan:optimize', 'deploy:pb_deployer_post_hook');
+
+//the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
+after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
+
+// by default, deployments are unlocked if they fail
+after('deploy:failed', 'deploy:unlock');
