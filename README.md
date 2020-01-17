@@ -20,7 +20,7 @@ This will install the package globally
   Example: `include_path = ".:/usr/share/php:/home/ubuntu/.config/composer/vendor"`. 
   4. Create a file name `.slack_webhook_url` in the some folder as this read me and add a secret slack webhook url as 
   the only contents. This will enable build notification to be posted to that url. If this is not done, notifications
-  will not be sent.
+  will not be sent. File should persist between updates.
   
 ## Use  
 
