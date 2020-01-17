@@ -20,7 +20,8 @@ This will install the package globally
   Example: `include_path = ".:/usr/share/php:/home/ubuntu/.config/composer/vendor"`. 
   4. Create a file named `.slack_webhook_url` in the home folder of the user that will be running the composer script.
   The contents of the file should be the url of the slack webhook that will be posted to on deploy completetion. 
-  This will enable build notifications to be posted to that url. If this is not done, notifications will not be sent.  
+  This will enable build notifications to be posted to that url. If this is not done, notifications will not be sent.
+  The recommended permission for the file is 600 (`chmod 600 .slack_webhook_url`).  
   
 ## Use  
 
