@@ -70,6 +70,32 @@ set('common_symlinks', []);
 /**
  *
  *
+ *
+ * Support functions
+ *
+ *
+ *
+ */
+
+/**
+ *
+ * taskExists
+ *
+ * true if the named task exists
+ *
+ * @param $name
+ * @return string
+ */
+function taskExists($name)
+{
+    $deployer = Deployer::get();
+    return $deployer->tasks->has($name);
+}
+
+
+/**
+ *
+ *
  * Options that can be used in the command line
  *
  *
@@ -255,6 +281,12 @@ task('deploy:build_metadata', function (){
         //compare the current branch to the base branch
         // useful for creating the most common pull requests
         $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
+        //compare the current tag against the base branch
+        // useful to create a pr for a specific version you've tested
+        // useful to create a pr then continue developing on the same branch without changing the diff of the pr
+        // (which would happen if you did a branch pr and then later pushed more commits to the compared branch before
+        // its merged)
+        $buildDetails['git_tag_pr_url'] = ! empty($tag) ? escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$tag}") : '';
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
@@ -666,7 +698,8 @@ task('deploy:pb_deployer_post_hook_laravel', [
 /**
  * Tasks we want to do every time for all app deployments
  *
- * Run after deploy:clear_paths task
+ * Run after deploy:clear_paths task for apps *with out* laravel recipe
+ * Run after artisan:optimize task for apps with laravel recipe
  *
  */
 desc('Common Point Blue deployer tasks to run just before releasing the app');
@@ -683,17 +716,25 @@ before('deploy:vendors', 'deploy:common_symlinks');
  *
  * deploy:pb_deployer_post_hook task order
  *
- * the hook is added after two tasks- artisan:optimize and deploy:clear_paths
+ * the hook is added after one of these tasks- artisan:optimize and deploy:clear_paths
  * this works because we assume that a deployment will only include one or the other, not both.
  *
  *
  */
 
-//the artisan:optimize task is only executed from the laravel recipe.
-after('artisan:optimize', 'deploy:pb_deployer_post_hook');
+if(taskExists('artisan:optimize'))
+{
+    //the artisan:optimize task is only executed from the laravel recipe.
+    after('artisan:optimize', 'deploy:pb_deployer_post_hook');
+}
+else
+{
+    //the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
+    after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
+}
 
-//the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
-after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
+
+
 
 // by default, deployments are unlocked if they fail
 after('deploy:failed', 'deploy:unlock');
