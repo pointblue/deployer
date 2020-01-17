@@ -18,6 +18,23 @@ use Symfony\Component\Console\Input\InputOption;
  *
  */
 
+//default to empty string
+set('slack_webhook_url', '');
+
+//read special configuration files to load secrets
+//if .slack_webhook_url file exists in the path that the `include` function can use
+if (file_exists(stream_resolve_include_path('.slack_webhook_url')))
+{
+    //output the contents of the file to the buffer
+    ob_start();
+    include('.slack_webhook_url');
+    //then put the buffer contents in a variable
+    $slack_webhook_url = ob_get_clean();
+    //set the variable as a configuration in deployer
+    set('slack_webhook_url', $slack_webhook_url);
+}
+
+
 //default to test server preventing accidental changes to production if the user doesn't supply a stage/host argument
 set('default_stage', 'nonprod-aws');
 
@@ -238,6 +255,12 @@ task('deploy:build_metadata', function (){
         //compare the current branch to the base branch
         // useful for creating the most common pull requests
         $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
+        //compare the current tag against the base branch
+        // useful to create a pr for a specific version you've tested
+        // useful to create a pr then continue developing on the same branch without changing the diff of the pr
+        // (which would happen if you did a branch pr and then later pushed more commits to the compared branch before
+        // its merged)
+        $buildDetails['git_tag_pr_url'] = ! empty($tag) ? escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$tag}") : '';
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
