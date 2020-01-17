@@ -255,12 +255,6 @@ task('deploy:build_metadata', function (){
         //compare the current branch to the base branch
         // useful for creating the most common pull requests
         $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
-        //compare the current tag against the base branch
-        // useful to create a pr for a specific version you've tested
-        // useful to create a pr then continue developing on the same branch without changing the diff of the pr
-        // (which would happen if you did a branch pr and then later pushed more commits to the compared branch before
-        // its merged)
-        $buildDetails['git_tag_pr_url'] = ! empty($tag) ? escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$tag}") : '';
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
