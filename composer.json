@@ -7,8 +7,8 @@
             "email": "datasolutions@pointblue.org"
         }
     ],
-    "pre-update-cmd": "test -f .slack_webhook_url && cp .slack_webhook_url ~/",
-    "post-update-cmd": "test -f ~/.slack_webhook_url && mv ~/.slack_webhook_url ./",
+    "pre-update-cmd": "test -f ~/.config/composer/vendor/pointblue/deployer/.slack_webhook_url && cp ~/.config/composer/vendor/pointblue/deployer/.slack_webhook_url ~/",
+    "post-update-cmd": "test -f ~/.slack_webhook_url && mv ~/.slack_webhook_url ~/.config/composer/vendor/pointblue/deployer/",
     "require": {
     }
 }
