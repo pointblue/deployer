@@ -23,11 +23,11 @@ set('slack_webhook_url', '');
 
 //read special configuration files to load secrets
 //if .slack_webhook_url file exists in the path that the `include` function can use
-if (file_exists(stream_resolve_include_path('.slack_webhook_url')))
+if (file_exists(getenv('HOME') . '/.slack_webhook_url'))
 {
     //output the contents of the file to the buffer
     ob_start();
-    include('.slack_webhook_url');
+    include(getenv('HOME') . '/.slack_webhook_url');
     //then put the buffer contents in a variable
     $slack_webhook_url = ob_get_clean();
     //set the variable as a configuration in deployer

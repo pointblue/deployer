@@ -18,9 +18,9 @@ This will install the package globally
   3. Update `include_path` by appending the global composer's vendor path to the end of the string 
   as `:/home/user/.config/composer/vendor` and save the file.  
   Example: `include_path = ".:/usr/share/php:/home/ubuntu/.config/composer/vendor"`. 
-  4. Create a file name `.slack_webhook_url` in the some folder as this read me and add a secret slack webhook url as 
-  the only contents. This will enable build notification to be posted to that url. If this is not done, notifications
-  will not be sent. File should persist between updates.
+  4. Create a file named `.slack_webhook_url` in the home folder of the user that will be running the composer script.
+  The contents of the file should be the url of the slack webhook that will be posted to on deploy completetion. 
+  This will enable build notifications to be posted to that url. If this is not done, notifications will not be sent.  
   
 ## Use  
 
