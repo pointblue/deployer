@@ -178,6 +178,27 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
+/**
+ *
+ *
+ * other variables
+ *
+ *
+ */
+set('is_laravel', function(){
+    $isLaravel = false;
+    $releasePath = get('release_path');
+    $composerFile = "{$releasePath}/composer.json";
+    if(file_exists($composerFile))
+    {
+        $contents = file_get_contents($composerFile);
+        $composerJson = json_decode($contents, TRUE);    //turn this into a PHP associative array
+        //if the composer.json file has a `require` property and that property has a `laravel/framework property
+        // then this is a laravel app
+        $isLaravel = (bool)(array_key_exists('require', $composerJson) && array_key_exists('laravel/framework', $composerJson['require']));
+    }
+    return $isLaravel;
+});
 
 /**
  *
@@ -208,6 +229,22 @@ task('deploy:bower_components', function(){
 desc("build runtime assets (css, js, etc)");
 task('deploy:build_assets', function(){
     run("cd {{release_path}} && yarn run prod");
+});
+
+
+/**
+ *
+ *
+ * deploy:create_laravel_dirs
+ *
+ *
+ * Create directories needed by a laravel app.
+ *
+ *
+ */
+desc('Creates default laravel directories needed for laravel app to function');
+task('deploy:create_laravel_dirs', function(){
+    run('cd {{release_path}} && mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache bootstrap/cache');
 });
 
 
@@ -725,6 +762,13 @@ else
 {
     //the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
     after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
+}
+
+//if the deploy:shared task exists AND this is a laravel app
+if(taskExists('deploy:shared') && get('is_laravel'))
+{
+    //add a task that creates the required laravel dirs
+    after('deploy:shared', 'deploy:create_laravel_dirs');
 }
 
 
