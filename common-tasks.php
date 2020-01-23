@@ -2,8 +2,70 @@
 
 namespace Deployer;
 
+require_once 'recipe/common.php';   //https://github.com/deployphp/deployer/blob/4.x/recipe/common.php
+
+use Deployer\Exception\GracefulShutdownException;
+use Deployer\Executor\ParallelExecutor;
+use Deployer\Executor\SeriesExecutor;
 use Symfony\Component\Console\Input\InputOption;
 
+//the default deploy task just prepares the deployment and downloads the latest code
+// we'll add tasks to this based on the files in the updated code
+desc('Deploy your project');
+task('deploy',[
+    'deploy:prepare',
+    'deploy:lock',
+    'deploy:release',
+    'deploy:update_code',
+    'deploy:shared',
+    'deploy:conditional_tasks',
+    'deploy:symlink',
+    'deploy:unlock',
+    'cleanup',
+    'success'
+]);
+
+
+//this is copied from the latest version of deployer
+/**
+ * Run task
+ *
+ * @experimental
+ * @param string $task
+ */
+function invoke_task($task)
+{
+    $input = input();
+    $output = output();
+    $deployer = Deployer::get();
+    $stage = $input->hasArgument('stage') ? $input->getArgument('stage') : null;
+    $tasks = $deployer->getScriptManager()->getTasks($task, $stage);
+    $servers = $deployer->getStageStrategy()->getServers($stage);
+    $environments = iterator_to_array($deployer->environments);
+    if ($input->getOption('parallel')) {
+        $executor = new ParallelExecutor($deployer->getConsole()->getUserDefinition());
+    } else {
+        $executor = new SeriesExecutor();
+    }
+
+    try {
+        $executor->run($tasks, $servers, $environments, $input, $output);
+    } catch (\Exception $exception) {
+        \Deployer\logger($exception->getMessage(), Logger::ERROR);
+
+        if (!($exception instanceof GracefulShutdownException)) {
+            // Check if we have tasks to execute on failure.
+            if ($deployer['onFailure']->has($this->getName())) {
+                $taskName = $deployer['onFailure']->get($this->getName());
+                $tasks = $deployer->getScriptManager()->getTasks($taskName, $stage);
+                $executor->run($tasks, $servers, $environments, $input, $output);
+            }
+        }
+
+        throw $exception;
+    }
+
+}
 
 /**
  *
@@ -115,6 +177,11 @@ option('pb-test', null, InputOption::VALUE_NONE, 'Have a Point Blue task print t
  *
  */
 
+//npm
+set('bin/npm', function () {
+    return (string)run('which npm');
+});
+
 //yarn
 set('bin/yarn', function () {
     return (string)run('which yarn');
@@ -185,6 +252,47 @@ set('git_rev_url', function (){
  *
  *
  */
+set('has_yarn_lock', function(){
+    $releasePath = get('release_path');
+    return file_exists("{$releasePath}/yarn.lock");
+});
+
+set('has_package_json', function(){
+    $releasePath = get('release_path');
+    return file_exists("{$releasePath}/package.json");
+});
+
+set('has_package_lock_json', function(){
+    $releasePath = get('release_path');
+    return file_exists("{$releasePath}/package-lock.json");
+});
+
+set('has_bower_json', function(){
+    $releasePath = get('release_path');
+    return file_exists("{$releasePath}/bower.json");
+});
+set('has_composer_json', function(){
+    $releasePath = get('release_path');
+    return file_exists("{$releasePath}/composer.json");
+});
+
+//true if there is a package.json file with a `scripts.prod` property
+set('has_node_build_command', function(){
+    $hasBuildCommand = false;
+    $releasePath = get('release_path');
+    $packageFile = "{$releasePath}/package.json";
+    if(file_exists($packageFile))
+    {
+        $contents = file_get_contents($packageFile);
+        $packageJson = json_decode($contents, TRUE);    //turn this into a PHP associative array
+        //if the package.json file has a `scripts` property and that property has a `prod` property
+        // then this project's assets can but built using `npm run prod` or `yarn run prod`
+        $hasBuildCommand = (bool)(array_key_exists('scripts', $packageJson) && array_key_exists('prod', $packageJson['scripts']));
+    }
+    return $hasBuildCommand;
+});
+
+
 set('is_laravel', function(){
     $isLaravel = false;
     $releasePath = get('release_path');
@@ -211,10 +319,37 @@ set('is_laravel', function(){
  */
 
 
-//Install node_modules defined in yarn.lock
+/**
+ *
+ *
+ * deploy:node_modules
+ *
+ * installs dependencies with npm or yarn depending on the lock files available.
+ *
+ * if yarn.lock exists, use yarn to install with the frozen lockfile option (no package updates, install only)
+ * if not, but package-lock.json exists, use npm to install with the ci command
+ * if not, there are no lock file. just use yarn to install
+ *
+ */
 desc('Install node modules (npm/yarn)');
 task('deploy:node_modules', function () {
-    run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
+
+    //if a yarn.lock file is present
+    if(get('has_yarn_lock'))
+    {
+        //use yarn to install node_modules
+        run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
+    }
+    elseif(get('has_package_lock_json'))    //if not yarn.lock, but has a package-lock.json file
+    {
+        //use npm with the ci option to install node_modules
+        run("cd {{release_path}} && {{bin/npm}} ci");
+    }
+    else    //no lock files, just use yarn to install
+    {
+        run("cd {{release_path}} && {{bin/yarn}} install");
+    }
+
 });
 
 //use yarn to run the 'prod' script with should be define in the package.json of the repo in the "scripts" property
@@ -706,6 +841,69 @@ task('deploy:common_symlinks', function(){
  *
  */
 
+//this will find tasks based on the files in the repo
+// it can only be executed after the task that clones the most recent code from github
+task('deploy:conditional_tasks', function(){
+
+
+    //if this is a laravel app, the deploy task has already been defined in the laravel recipe
+    // all we need to do is add tasks in the correct order for the deployment
+    //  however, if this is not a laravel app, the deploy task has not yet been defined.
+    //  in this case we will create a default deploy task and then add tasks as needed
+    if( get('is_laravel') )
+    {
+        //TODO: Figure out how to weave the tasks defined here with the tasks defined in laravel.php
+        $originalTasks = task('deploy');
+        require_once 'recipe/laravel.php';  //https://github.com/deployphp/deployer/blob/4.x/recipe/laravel.php
+        $newTasks = task('deploy');
+    }
+    else
+    {
+        //the first default tasks
+        $taskList = [
+            'deploy:writable',
+        ];
+
+        //if the project has a composer.json file, then run the task that calls `composer install`
+        if(get('has_composer_json'))
+        {
+            array_push($taskList, 'deploy:vendors');
+        }
+
+        if(get('has_bower_json'))
+        {
+            array_push($taskList, 'deploy:bower_components');
+        }
+
+        //if the project has a package.json file, then run the task that calls either `yarn install` or `npm install`.
+        // the task itself decides to run yarn or npm based on the available lock files
+        if(get('has_package_json'))
+        {
+            array_push($taskList, 'deploy:node_modules');
+            if(get('has_node_build_command'))
+            {
+                array_push($taskList, 'deploy:build_assets');
+            }
+        }
+
+        //the final default tasks
+        array_merge($taskList, [
+            'deploy:clear_paths'
+        ]);
+
+        //loop the tasks and run each on
+        for($i=0;$i<count($taskList);$i++)
+        {
+            invoke_task($taskList[$i]);
+        }
+
+    }
+
+
+
+});
+
+
 
 
 
@@ -739,8 +937,13 @@ task('deploy:pb_deployer_post_hook', [
     'deploy:build_metadata'
 ]);
 
-//before running the composer install command, create the symlinks that will be needed, if any
-before('deploy:vendors', 'deploy:common_symlinks');
+
+if(taskExists('deploy:vendors'))
+{
+    //before running the composer install command, create the symlinks that will be needed, if any
+    before('deploy:vendors', 'deploy:common_symlinks');
+}
+
 
 /**
  *
@@ -781,8 +984,6 @@ if(taskExists('deploy:shared') && get('is_laravel'))
     //add a task that creates the required laravel dirs
     after('deploy:shared', 'deploy:create_laravel_dirs');
 }
-
-
 
 
 // by default, deployments are unlocked if they fail
