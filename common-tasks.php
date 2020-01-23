@@ -735,7 +735,6 @@ task('deploy:pb_deployer_post_hook_laravel', [
  */
 desc('Common Point Blue deployer tasks to run just before releasing the app');
 task('deploy:pb_deployer_post_hook', [
-    'deploy:symlink_envs',
     'deploy:update_autoload_classmap',
     'deploy:build_metadata'
 ]);
@@ -762,6 +761,18 @@ else
 {
     //the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
     after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
+}
+
+if(taskExists('artisan:config:cache'))
+{
+    //.env symlinks must be created before composer caches the config files
+    // otherwise, nothing will be cached and the app will fail to run
+    before('artisan:config:cache', 'deploy:symlink_envs');
+}
+else
+{
+    //if the artisan (laravel) task doesn't exist, deploy the env symlinks after the shared folders and files are made
+    after('deploy:shared', 'deploy:symlink_envs');
 }
 
 //if the deploy:shared task exists AND this is a laravel app
