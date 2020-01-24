@@ -2,6 +2,8 @@
 
 namespace Deployer;
 
+require_once 'recipe/common.php';
+
 use Symfony\Component\Console\Input\InputOption;
 
 
@@ -178,6 +180,13 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
+set('git_remote_origin', function(){
+    return (string)runLocally('git remote get-url origin');
+});
+
+//by default, use the origin url defined on the machine deploying this repo
+set('repository', get('git_remote_origin'));
+
 /**
  *
  *
@@ -185,10 +194,45 @@ set('git_rev_url', function (){
  *
  *
  */
-set('is_laravel', function(){
+
+function has_yarn_lock(){
+    return file_exists("yarn.lock");
+}
+
+function has_package_json(){
+    return file_exists("package.json");
+}
+
+function has_package_lock_json(){
+    return file_exists("package-lock.json");
+}
+
+function has_bower_json(){
+    return file_exists("bower.json");
+}
+
+function has_composer_json(){
+    return file_exists("composer.json");
+}
+
+//true if there is a package.json file with a `scripts.prod` property
+function has_node_build_command(){
+    $hasBuildCommand = false;
+    $packageFile = "package.json";
+    if(file_exists($packageFile))
+    {
+        $contents = file_get_contents($packageFile);
+        $packageJson = json_decode($contents, TRUE);    //turn this into a PHP associative array
+        //if the package.json file has a `scripts` property and that property has a `prod` property
+        // then this project's assets can but built using `npm run prod` or `yarn run prod`
+        $hasBuildCommand = (bool)(array_key_exists('scripts', $packageJson) && array_key_exists('prod', $packageJson['scripts']));
+    }
+    return $hasBuildCommand;
+}
+
+function has_laravel(){
     $isLaravel = false;
-    $releasePath = get('release_path');
-    $composerFile = "{$releasePath}/composer.json";
+    $composerFile = "composer.json";
     if(file_exists($composerFile))
     {
         $contents = file_get_contents($composerFile);
@@ -198,7 +242,7 @@ set('is_laravel', function(){
         $isLaravel = (bool)(array_key_exists('require', $composerJson) && array_key_exists('laravel/framework', $composerJson['require']));
     }
     return $isLaravel;
-});
+}
 
 /**
  *
@@ -211,10 +255,37 @@ set('is_laravel', function(){
  */
 
 
-//Install node_modules defined in yarn.lock
+/**
+ *
+ *
+ * deploy:node_modules
+ *
+ * installs dependencies with npm or yarn depending on the lock files available.
+ *
+ * if yarn.lock exists, use yarn to install with the frozen lockfile option (no package updates, install only)
+ * if not, but package-lock.json exists, use npm to install with the ci command
+ * if not, there are no lock file. just use yarn to install
+ *
+ */
 desc('Install node modules (npm/yarn)');
 task('deploy:node_modules', function () {
-    run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
+
+    //if a yarn.lock file is present
+    if(has_yarn_lock())
+    {
+        //use yarn to install node_modules
+        run("cd {{release_path}} && {{bin/yarn}} install --frozen-lockfile");
+    }
+    elseif(has_package_lock_json())    //if not yarn.lock, but has a package-lock.json file
+    {
+        //use npm with the ci option to install node_modules
+        run("cd {{release_path}} && {{bin/npm}} ci");
+    }
+    else    //no lock files, just use yarn to install
+    {
+        run("cd {{release_path}} && {{bin/yarn}} install");
+    }
+
 });
 
 //use yarn to run the 'prod' script with should be define in the package.json of the repo in the "scripts" property
@@ -588,16 +659,16 @@ task('deploy:symlink_envs', function(){
  *   - deju2-renew
  *   - deju3
  *
- * To do this, you must add a configuration to your deploy.php as:
+ * To do this, a structure is created
  *
- * set('common_symlinks', [
- *    "base_path" => "{{deploy_path}}/apps/common",
- *    "libs" => [
+ * [
+ *  "base_path" => "{{deploy_path}}/apps/common",
+ *  "libs" => [
  *     "deju2",
  *     "deju2-renew",
  *     "deju3"
  *   ]
- * ]);
+ * ]
  *
  * Where the `base_path` property is the path where your symlinks will go and the `libs` property is an array of library
  * names where each library is a deployed repo that will be symlinked. The library must be defined in the $libNames
@@ -628,6 +699,7 @@ task('deploy:symlink_envs', function(){
 desc('Create symlinks to point blue dependencies in composer.json');
 task('deploy:common_symlinks', function(){
 
+
     //Note: I use the term 'library' here because this was originally intended for the deju libraries. Library can also
     // be thought of as any git repo that is a dependency and needs to be symlinked for this deployment to resolve a
     // path to it
@@ -656,10 +728,80 @@ task('deploy:common_symlinks', function(){
         ]
     ];
 
-    $commonSymlinks = get('common_symlinks');
+    $commonSymlinks = [
+        "base_path" => '',
+        "libs" => []
+    ];
+
+    $composerFile = "composer.json";
+    if(file_exists($composerFile))
+    {
+
+        $contents = file_get_contents($composerFile);
+        $composerJson = json_decode($contents, TRUE);    //turn this into a PHP associative array
+
+        //find deju mapped classes
+        $mappedClasses = [];
+        //check the autoload-dev section for deju classmaps
+        if(
+            array_key_exists('autoload-dev', $composerJson) &&
+            array_key_exists('classmap', $composerJson['autoload-dev']) &&
+            has_deju_mapped_classes($composerJson['autoload-dev']['classmap'])
+        )
+        {
+            $mappedClasses = $composerJson['autoload-dev']['classmap'];
+        }
+
+        //check the autoload section for deju classmaps
+        if(
+            array_key_exists('autoload', $composerJson) &&
+            array_key_exists('classmap', $composerJson['autoload']) &&
+            has_deju_mapped_classes($composerJson['autoload']['classmap'])
+        )
+        {
+            $mappedClasses = $composerJson['autoload']['classmap'];
+        }
+
+        for($i=0;$i<count($mappedClasses);$i++)
+        {
+            //Try to find one of the deju libraries
+            // This assumes that if one deju library is found, then all other deju libraries are in the same place
+            $find = '/apps\/common\/(deju2|deju2-renew|deju3)/';
+            if( preg_match($find, $mappedClasses[$i]) === 1)
+            {
+                $commonSymlinks['base_path'] = '{{release_path}}';
+                $commonSymlinks['libs'] = [
+                    'deju2',
+                    'deju2-renew',
+                    'deju3',
+                    'apps-authentication-common'
+                ];
+                //get the base path
+                // this assumes that the path looks something like ../../apps/common
+                $parts = explode('/', $mappedClasses[$i]);
+                //count how many `..` paths we have
+                for($j=0;$j<count($parts);$j++)
+                {
+                    if($parts[$j] === '..')
+                    {
+                        $commonSymlinks['base_path'] .= '/..';
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                $commonSymlinks['base_path'] .= '/apps/common/';
+
+                break;
+            }
+        }
+    }
+
+
 
     //common_symlinks is an empty array by default. check if the necessary properties are available to run the function.
-    if(!array_key_exists('base_path', $commonSymlinks) || !array_key_exists('libs', $commonSymlinks))
+    if(empty($commonSymlinks['base_path']) || count($commonSymlinks['libs']) < 1 )
     {
         return;
     }
@@ -669,6 +811,14 @@ task('deploy:common_symlinks', function(){
 
     //create the path where the symlinks will go
     run("mkdir -p {$basePath}");
+
+    if(count($libs) > 0)
+    {
+        $message = 'AUTOMATED ACTION EXECUTING: create common_symlinks because composer.json file has references' .
+            ' to at least one deju path ins /apps/common';
+        writeln($message);
+        logger($message);
+    }
 
     //create a symlink for each lib in the libs array
     for($i=0;$i<count($libs);$i++)
@@ -690,6 +840,22 @@ task('deploy:common_symlinks', function(){
     }
 
 });
+
+function has_deju_mapped_classes($mappedClasses)
+{
+    for($i=0;$i<count($mappedClasses);$i++)
+    {
+        //Try to find one of the deju libraries
+        // This assumes that if one deju library is found, then all other deju libraries are in the same place
+        $find = '/apps\/common\/(deju2|deju2-renew|deju3)/';
+        if( preg_match($find, $mappedClasses[$i]) === 1)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 
 /**
@@ -739,50 +905,124 @@ task('deploy:pb_deployer_post_hook', [
     'deploy:build_metadata'
 ]);
 
-//before running the composer install command, create the symlinks that will be needed, if any
-before('deploy:vendors', 'deploy:common_symlinks');
+
 
 /**
  *
- * deploy:pb_deployer_post_hook task order
  *
- * the hook is added after one of these tasks- artisan:optimize and deploy:clear_paths
- * this works because we assume that a deployment will only include one or the other, not both.
+ * TASK ORDER
+ *
+ * This defines the order of tasks that are run when executing the deploy task (dep deploy).
+ * It is conditional on the files that are present in the project
  *
  *
  */
 
-if(taskExists('artisan:optimize'))
-{
-    //the artisan:optimize task is only executed from the laravel recipe.
-    after('artisan:optimize', 'deploy:pb_deployer_post_hook');
-}
-else
-{
-    //the deploy:clear_paths task is only in the default deploy.php file which uses the common.php recipe
-    after('deploy:clear_paths', 'deploy:pb_deployer_post_hook');
-}
 
-if(taskExists('artisan:config:cache'))
+//define which tasks will execute
+// first, divide deployments into laravel and non-laravel
+if( has_laravel() )
 {
+    echo "loading recipe/laravel.php because composer.json present with `require.laravel/framework` property\n";
+    require_once 'recipe/laravel.php';
+
+    //since the laravel recipe we just included already defines the deploy task, we'll use 'before' and 'after'
+    // functions to add tasks in the order we want
+
+    //add a task that creates the required laravel dirs
+    after('deploy:shared', 'deploy:create_laravel_dirs');
+
+    //before running the composer install command, create the symlinks that will be needed, if any
+    before('deploy:vendors', 'deploy:common_symlinks');
+
     //.env symlinks must be created before composer caches the config files
     // otherwise, nothing will be cached and the app will fail to run
     before('artisan:config:cache', 'deploy:symlink_envs');
+
+    //the artisan:optimize task is last before changing this release to the current release.
+    after('artisan:optimize', 'deploy:pb_deployer_post_hook');
+
+    //
+    // tasks that are conditional
+    //
+
+    //it is assumed that all projects with bower also have a package.json file
+    if( has_bower_json() )
+    {
+        echo "Adding deploy:bower_components task because bower.json file is present\n";
+        after('deploy:vendors', 'deploy:bower_components');
+    }
+
+    //if the project has a package.json file, then run the task that calls either `yarn install` or `npm install`.
+    // the task itself decides to run yarn or npm based on the available lock files
+    if( has_package_json() )
+    {
+        echo "Adding deploy:node_modules task because package.json file is present\n";
+        after('deploy:vendors', 'deploy:node_modules');
+        if( has_node_build_command() )
+        {
+            echo "Adding deploy:build_assets task because package.json file is present with `scripts.prod` property\n";
+            after('deploy:node_modules', 'deploy:build_assets');
+        }
+    }
 }
+//elseif( ! has('custom_deploy') || ( has('custom_deploy') && get('custom_deploy') ) )
 else
 {
-    //if the artisan (laravel) task doesn't exist, deploy the env symlinks after the shared folders and files are made
-    after('deploy:shared', 'deploy:symlink_envs');
+    //tasks that must run first, for all non-laravel deployments
+    $taskList = [
+        'deploy:prepare',
+        'deploy:lock',
+        'deploy:release',
+        'deploy:update_code',
+        'deploy:shared',
+        'deploy:symlink_envs',
+        'deploy:writable',
+    ];
+
+    //
+    // tasks that are conditional
+    //
+
+    //if the project has a composer.json file, then run the task that calls `composer install`
+    if( has_composer_json() )
+    {
+        echo "Adding deploy:common_symlinks task because composer.json file is present\n";
+        array_push($taskList, 'deploy:common_symlinks');
+        echo "Adding deploy:vendors task because composer.json file is present\n";
+        array_push($taskList, 'deploy:vendors');
+    }
+
+    if( has_bower_json() )
+    {
+        echo "Adding deploy:bower_components task because bower.json file is present\n";
+        array_push($taskList, 'deploy:bower_components');
+    }
+
+    //if the project has a package.json file, then run the task that calls either `yarn install` or `npm install`.
+    // the task itself decides to run yarn or npm based on the available lock files
+    if( has_package_json() )
+    {
+        echo "Adding deploy:node_modules task because package.json file is present\n";
+        array_push($taskList, 'deploy:node_modules');
+        if( has_node_build_command() )
+        {
+            echo "Adding deploy:build_assets task because package.json file is present with `scripts.prod` property\n";
+            array_push($taskList, 'deploy:build_assets');
+        }
+    }
+
+    desc('Deploy your project');
+    //merge tasks that have to run last to the end of the task list
+    task('deploy', array_merge($taskList, [
+        'deploy:clear_paths',
+        'deploy:pb_deployer_post_hook',
+        'deploy:symlink',
+        'deploy:unlock',
+        'cleanup',
+        'success'
+    ]));
 }
-
-//if the deploy:shared task exists AND this is a laravel app
-if(taskExists('deploy:shared') && get('is_laravel'))
-{
-    //add a task that creates the required laravel dirs
-    after('deploy:shared', 'deploy:create_laravel_dirs');
-}
-
-
 
 
 // by default, deployments are unlocked if they fail
