@@ -180,12 +180,8 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
-set('git_remote_origin', function(){
-    return (string)runLocally('git remote get-url origin');
-});
-
 //by default, use the origin url defined on the machine deploying this repo
-set('repository', get('git_remote_origin'));
+set('repository', (string)exec('git remote get-url origin'));
 
 /**
  *
