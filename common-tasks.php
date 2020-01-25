@@ -394,7 +394,8 @@ task('deploy:build_metadata', function (){
     }
     else
     {
-        //TODO: Add a link to the master commits so I can easily calculate the next version number
+        //Add a link to the master commits so I can easily calculate the next version number
+        $buildDetails['git_master_commits_url'] = escapeshellarg("{$repoUrl}/commits/master");
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
