@@ -68,6 +68,9 @@ set('build_meta_output', 'deployer_php_build.json');
 //create this with an empty array to be sure that our function which expecting `common_symlinks` to be set
 set('common_symlinks', []);
 
+//by default, use the origin url defined on the machine deploying this repo
+set('repository', (string)exec('git remote get-url origin'));
+
 
 /**
  *
@@ -180,8 +183,10 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
-//by default, use the origin url defined on the machine deploying this repo
-set('repository', (string)exec('git remote get-url origin'));
+//TODO: Get next suggested version number
+
+
+
 
 /**
  *
@@ -385,6 +390,11 @@ task('deploy:build_metadata', function (){
         //compare the current branch to the base branch
         // useful for creating the most common pull requests
         $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
+
+    }
+    else
+    {
+        //TODO: Add a link to the master commits so I can easily calculate the next version number
     }
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
@@ -436,6 +446,28 @@ after('success', 'announce:rev_url');
 /**
  *
  *
+ * # announce:git_pr_url
+ *
+ *
+ * Produces a link in the command line to the deployed revision in github if running in verbose or very verbose mode.
+ *
+ *
+ */
+desc('announce the revision url for this release');
+task('announce:git_pr_url', function(){
+    $gitRevUrl = get('git_rev_url');
+    if( ! empty($gitRevUrl) && (isVerbose() || isVeryVerbose()) )
+    {
+        $message = "See revision in github: $gitRevUrl";
+        writeln($message);
+    }
+});
+//announcements come after the success task
+after('success', 'announce:rev_url');
+
+/**
+ *
+ *
  * # announce:launch_url
  *
  *
@@ -474,6 +506,7 @@ after('success', 'announce:launch_url');
 desc('Notify slack of build status');
 task('slack:notify', function (){
     $webhookEndpoint = get('slack_webhook_url');
+    $branch = get('git_branch');
 
     //cannot complete function without webhook endpoint
     if(empty($webhookEndpoint))
@@ -484,31 +517,53 @@ task('slack:notify', function (){
         return;
     }
 
-    $repo = get('repository');
+    $repoName = preg_replace('/^(git@github.com:)(.+)\.git$/', '$2', get('repository'));
+
     $rev = get('git_rev');
+
+
     //TODO: For some reason when I use get('host') or get('stage') here, it doesn't work
     // [RuntimeException] Configuration parameter `stage` does not exists.
     $buildFilename = get('build_meta_output');
     if(has('launch_url'))
     {
         $launchUrl = get('launch_url');
-        $toUrl = "\nLaunch URL: {$launchUrl}";
-        $buildDetails = "\nBuild details: {$launchUrl}/{$buildFilename}";
+        //only works for .org hosts
+        $launchUrlHost = preg_replace('/^https*:\/\/(.+\.org)\/(.+)/', '$1', $launchUrl);
+        $launchUrlHostMessage = " to {$launchUrlHost}";
+        $toUrl = "\n*Launch URL*: {$launchUrl}";
+        $buildDetails = "\n*Build details*: {$launchUrl}/{$buildFilename}";
     }
     else
     {
+        $launchUrlHost = '';
+        $launchUrlHostMessage = '';
         $toUrl = '';
         $buildDetails = '';
     }
 
-    $message = "{$repo} has been successfully deployed" .
-        "\nGit revision: {$rev}" .
+    $message = "*Repo*: {$repoName}" .
+        "\n*Branch*: {$branch}" .
+        (empty($launchUrlHost) ? '': "\n*Host*: {$launchUrlHost}") .
         "{$toUrl}" .
-        "{$buildDetails}"
+        "{$buildDetails}" .
+        "\n*Git revision*: {$rev}"
     ;
 
     $payload = [
-        'text' => $message
+        "text"=>"deploy {$repoName} ({$branch}){$launchUrlHostMessage} success{$toUrl}",
+        "blocks" => [
+            [
+                "type" => "section",
+                'text' => [
+                    "type"=> "mrkdwn",
+                    "text" => "$message"
+                ]
+            ],
+            [
+                "type" => "divider"
+            ]
+        ]
     ];
 
     $curlCommand = "curl -s -X POST -H 'Content-type: application/json' --data '" . json_encode($payload) . "' {$webhookEndpoint}";
@@ -812,7 +867,11 @@ task('deploy:common_symlinks', function(){
     {
         $message = 'AUTOMATED ACTION EXECUTING: create common_symlinks because composer.json file has references' .
             ' to at least one deju path ins /apps/common';
-        writeln($message);
+        if(isVerbose() || isVeryVerbose())
+        {
+            writeln($message);
+        }
+
         logger($message);
     }
 
