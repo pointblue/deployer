@@ -512,15 +512,17 @@ task('slack:notify', function (){
     //cannot complete function without webhook endpoint
     if(empty($webhookEndpoint))
     {
-        $message = 'Slack webhook not found (slack_webhook_url). Notification not sent.';
-        writeln($message);
-        logger($message);
+        $longMessage = 'Slack webhook not found (slack_webhook_url). Notification not sent.';
+        writeln($longMessage);
+        logger($longMessage);
         return;
     }
 
     $repoName = preg_replace('/^(git@github.com:)(.+)\.git$/', '$2', get('repository'));
 
     $rev = get('git_rev');
+    $revUrl = get('git_rev_url');
+    $repoUrl = get('git_repo_url');
 
 
     //TODO: For some reason when I use get('host') or get('stage') here, it doesn't work
@@ -531,38 +533,49 @@ task('slack:notify', function (){
         $launchUrl = get('launch_url');
         //only works for .org hosts
         $launchUrlHost = preg_replace('/^https*:\/\/(.+\.org)\/(.+)/', '$1', $launchUrl);
-        $launchUrlHostMessage = " to {$launchUrlHost}";
-        $toUrl = "\n*Launch URL*: {$launchUrl}";
-        $buildDetails = "\n*Build details*: {$launchUrl}/{$buildFilename}";
+        $hostShortMsg = " to {$launchUrlHost}";
+        $hostLongMsg = " deployed to {$launchUrlHost}";
+        $toUrl = "\n>\n>:link: {$launchUrl}";
+        $buildDetailsUrl = "{$launchUrl}/{$buildFilename}";
     }
     else
     {
-        $launchUrlHost = '';
-        $launchUrlHostMessage = '';
+        $buildDetailsUrl = '';
+        $hostShortMsg = '';
+        $hostLongMsg = '';
         $toUrl = '';
-        $buildDetails = '';
     }
 
-    $message = "*Repo*: {$repoName}" .
-        "\n*Branch*: {$branch}" .
-        (empty($launchUrlHost) ? '': "\n*Host*: {$launchUrlHost}") .
-        "{$toUrl}" .
-        "{$buildDetails}" .
-        "\n*Git revision*: {$rev}"
+    $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} success";
+    $longMessage =<<<SLACK_MESSAGE
+deployment success
+><{$repoUrl}|{$repoName}> @  <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$toUrl}
+
+SLACK_MESSAGE;
+
+    $contextMessage = "<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}^{$buildDetailsUrl}|" .
+        (string)date(DATE_ATOM) . " local build time> - <{$revUrl}|{$rev}>"
     ;
 
+
     $payload = [
-        "text"=>"deploy {$repoName} ({$branch}){$launchUrlHostMessage} success{$toUrl}",
+        "text"=> $shortMsg,
         "blocks" => [
             [
                 "type" => "section",
                 'text' => [
                     "type"=> "mrkdwn",
-                    "text" => "$message"
+                    "text" => "$longMessage"
                 ]
             ],
             [
-                "type" => "divider"
+                "type" => "context",
+                "elements" => [
+                    [
+                        "type" => "mrkdwn",
+                        "text" => $contextMessage
+                    ]
+                ]
             ]
         ]
     ];
