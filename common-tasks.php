@@ -533,9 +533,10 @@ task('slack:notify', function (){
         $launchUrl = get('launch_url');
         //only works for .org hosts
         $launchUrlHost = preg_replace('/^https*:\/\/(.+\.org)\/(.+)/', '$1', $launchUrl);
+        $hostEmoji = $launchUrlHost === 'data.pointblue.org' ? ':pointblue:' : ':construction:';
         $hostShortMsg = " to {$launchUrlHost}";
-        $hostLongMsg = " deployed to {$launchUrlHost}";
-        $toUrl = "\n>\n>:link: {$launchUrl}";
+        $hostLongMsg = " deployed to {$hostEmoji} {$launchUrlHost}";
+        $toUrl = "\n>\n>:rocket: <{$launchUrl}|Launch App>";
         $buildDetailsUrl = "{$launchUrl}/{$buildFilename}";
     }
     else
