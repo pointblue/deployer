@@ -157,6 +157,11 @@ set('git_rev', function(){
     return (string)run('cd {{release_path}} && git rev-parse HEAD');
 });
 
+//the revision short id of the currently deployed repo
+set('git_rev_short', function(){
+    return (string)run('cd {{release_path}} && git rev-parse --short HEAD');
+});
+
 //the tag, if any, associate with the current revision
 set('git_tag', function (){
     return (string)run('cd {{release_path}} && git tag --points-at HEAD');
@@ -506,6 +511,22 @@ after('success', 'announce:launch_url');
  */
 desc('Notify slack of build status');
 task('slack:notify', function (){
+
+    $hostAlias = [
+        "data.pointblue.org"=>[
+            "name"=>"production",
+            "emoji"=>":pointblue:"
+        ],
+        "data3.pointblue.org"=>[
+            "name"=>"old aws",
+            "emoji"=>":construction:"
+        ],
+        "data-test.pointblue.org"=>[
+            "name"=>"nonprod-aws",
+            "emoji"=>":construction:"
+        ]
+    ];
+
     $webhookEndpoint = get('slack_webhook_url');
     $branch = get('git_branch');
 
@@ -520,7 +541,7 @@ task('slack:notify', function (){
 
     $repoName = preg_replace('/^(git@github.com:)(.+)\.git$/', '$2', get('repository'));
 
-    $rev = get('git_rev');
+    $revShort = get('git_rev_short');
     $revUrl = get('git_rev_url');
     $repoUrl = get('git_repo_url');
 
@@ -533,10 +554,11 @@ task('slack:notify', function (){
         $launchUrl = get('launch_url');
         //only works for .org hosts
         $launchUrlHost = preg_replace('/^https*:\/\/(.+\.org)\/(.+)/', '$1', $launchUrl);
-        $hostEmoji = $launchUrlHost === 'data.pointblue.org' ? ':pointblue:' : ':construction:';
-        $hostShortMsg = " to {$launchUrlHost}";
-        $hostLongMsg = " deployed to {$hostEmoji} {$launchUrlHost}";
-        $toUrl = "\n>\n>:rocket: <{$launchUrl}|Launch App>";
+        $hostName = array_key_exists($launchUrlHost, $hostAlias) ? $hostAlias[$launchUrlHost]['name'] : $launchUrlHost;
+        $hostEmoji = array_key_exists($launchUrlHost, $hostAlias) ? $hostAlias[$launchUrlHost]['emoji'] : '';
+        $hostShortMsg = " to {$hostName}";
+        $hostLongMsg = " deployed to {$hostName} {$hostEmoji}";
+        $toUrl = "\n>:rocket: <{$launchUrl}|Launch App>";
         $buildDetailsUrl = "{$launchUrl}/{$buildFilename}";
     }
     else
@@ -548,14 +570,10 @@ task('slack:notify', function (){
     }
 
     $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} success";
-    $longMessage =<<<SLACK_MESSAGE
-deployment success
-><{$repoUrl}|{$repoName}> @  <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$toUrl}
+    $longMessage="deployment success\n><{$repoUrl}|{$repoName}> @ <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$toUrl}";
 
-SLACK_MESSAGE;
-
-    $contextMessage = "<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}^{$buildDetailsUrl}|" .
-        (string)date(DATE_ATOM) . " local build time> - <{$revUrl}|{$rev}>"
+    $contextMessage = "*<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}^{$buildDetailsUrl}|" .
+        (string)date(DATE_ATOM) . " local build time>* | <{$revUrl}|{$revShort}>"
     ;
 
 
