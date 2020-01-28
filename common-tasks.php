@@ -651,10 +651,17 @@ desc('Set deju autoload paths to current release');
 task('deploy:update_autoload_classmap', function(){
 
     //require a setting to run this function
-    if( ! has('update_autoload_classmap') ) {
-        return;
+    if( has('update_autoload_classmap') )
+    {
+        $appPaths = get('update_autoload_classmap');
     }
-    $appPaths = get('update_autoload_classmap');
+    else
+    {
+        //if there is a vendor path, automatically run this
+        // it could be done smarter by only running if a deju dependency is detected (this file already has the logic for this)
+        $appPaths = ['.'];
+    }
+
 
     foreach ($appPaths as $appPath) {
         ;
@@ -678,6 +685,7 @@ task('deploy:update_autoload_classmap', function(){
 
     }
 });
+after('deploy:vendors','deploy:update_autoload_classmap');
 
 /**
  *
@@ -989,7 +997,6 @@ task('deploy:pb_deployer_post_hook_laravel', [
  */
 desc('Common Point Blue deployer tasks to run just before releasing the app');
 task('deploy:pb_deployer_post_hook', [
-    'deploy:update_autoload_classmap',
     'deploy:build_metadata'
 ]);
 
