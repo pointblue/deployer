@@ -572,7 +572,8 @@ task('slack:notify', function (){
     $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} success";
     $longMessage="deployment success\n><{$repoUrl}|{$repoName}> @ <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$toUrl}";
 
-    $contextMessage = "*<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}^{$buildDetailsUrl}|" .
+    $buildDetailsMsg = "^{$buildDetailsUrl}";
+    $contextMessage = "*<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}{$buildDetailsMsg}|" .
         (string)date(DATE_ATOM) . " local build time>* | <{$revUrl}|{$revShort}>"
     ;
 
