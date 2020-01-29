@@ -729,6 +729,12 @@ task('deploy:symlink_envs', function(){
     //create a symlink for each target / destination pair
     foreach($envSymlinks as $envSymlink){
 
+        //if the target file we're linking to doesn't exist, throw an error
+        if(! test("[ -f \"{$envSymlink['target']}\" ]"))
+        {
+            throw new \Exception("the task deploy:symlink_envs is trying to symlink a file that does not exist: {$envSymlink['target']}" );
+        }
+
         $command = "{{bin/symlink}} {$envSymlink['target']} {$envSymlink['destination']}";
 
         if( input()->getOption('pb-test') ){
