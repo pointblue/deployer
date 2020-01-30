@@ -964,6 +964,70 @@ function has_deju_mapped_classes($mappedClasses)
     return false;
 }
 
+task('next:version', function(){
+
+    //change our working path to the release path just for this task
+    // this will ensure our test function can run in a loop correctly
+    $lastWorkingPath = workingPath();
+    $releasePath = get('release_path');
+    set('working_path', $releasePath);
+
+
+    run('{{bin/git}} fetch --tags');
+
+    $branch = get('git_branch');
+    $tag = get('git_tag');
+
+    //if this isn't the master branch or if the tag has a value
+    // leave the function
+    if( ! empty($tag) )
+    {
+        return;
+    }
+
+    //get year/week of todays date
+    $tag = 'v' . date('Y') . '.' . (integer)date('W');
+    $subversion = '';
+
+    //if the tag name we want to use is in conflict with an existing tag
+    while( test("git rev-parse \"{$tag}{$subversion}\" >/dev/null 2>&1") )
+    {
+        //increment a subversion for the tag
+
+        //if the string contains a single dot, it doesn't have a subversion number yet
+        if( preg_match_all('/\./', $tag) === 1 )
+        {
+            //add a period to separate it from the main version
+            $tag .= '.';
+            //and set a start value for the subversion that can be increment each loop
+            $subversion = 1;
+        }
+        else
+        {
+            //increment this subversion to be tested
+            $subversion++;
+        }
+    }
+
+    //add the subversion to the tag
+    $tag .= $subversion;
+
+    if( $branch === 'master')
+    {
+        writeln("This is an untagged master branch deployment.");
+        writeln("Suggested release tag name: {$tag}");
+    }
+    elseif( $branch === 'dev')
+    {
+        writeln("This is an untagged dev branch deployment.");
+        writeln("Suggested base tag name: {$tag}-rc");
+    }
+
+    //set back to the original working path
+    set('working_path', $lastWorkingPath);
+
+});
+
 
 /**
  *
