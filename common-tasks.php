@@ -344,6 +344,15 @@ task('deploy:create_laravel_dirs', function(){
 desc('Write information about the build to the deployment server');
 task('deploy:build_metadata', function (){
 
+    //change our working path to the release path just for this task
+    // this will ensure our test function can run in a loop correctly
+    $lastWorkingPath = workingPath();
+    $releasePath = get('release_path');
+    set('working_path', $releasePath);
+
+    //make sure it has the latest tags
+    run('{{bin/git}} fetch --tags');
+
     //TODO: Turn these into functions instead of using config settings to pass the value to other tasks
     //get the revision for the exact commit that's been built
     $rev = get('git_rev');
@@ -385,12 +394,52 @@ task('deploy:build_metadata', function (){
         "git_rev_url" => escapeshellarg($gitRevUrl)
     ];
 
+    //create a new tag to suggest for master and dev branches
+
+    //get year/week of todays date
+    $newTag = 'v' . date('Y') . '.' . (integer)date('W');
+    $subversion = '';
+
+    //if the tag name we want to use is in conflict with an existing tag
+    while( test("git rev-parse \"{$newTag}{$subversion}\" >/dev/null 2>&1") )
+    {
+        //increment a subversion for the tag
+
+        //if the string contains a single dot, it doesn't have a subversion number yet
+        if( preg_match_all('/\./', $newTag) === 1 )
+        {
+            //add a period to separate it from the main version
+            $newTag .= '.';
+            //and set a start value for the subversion that can be increment each loop
+            $subversion = 1;
+        }
+        else
+        {
+            //increment this subversion to be tested
+            $subversion++;
+        }
+    }
+
+    //add the subversion to the tag
+    $newTag .= $subversion;
+
     //add compare urls if this is not the master branch for convenience
     //we assume that this is useful only for branches other than master
     if( $branch !== 'master' )
     {
-        //the dev branch compares to the master branch and everything else compares to the dev branch
-        $compareBase = $branch === 'dev' ? 'master' : 'dev';
+
+
+        if($branch === 'dev')
+        {
+            $compareBase = 'master';
+            //the tag suggestion is the new tag plus the release candidate version suggestion
+            $buildDetails['git_tag_suggestion'] = $newTag . '-rcX';
+        }
+        else
+        {
+            $compareBase = 'dev';
+            $buildDetails['git_tag_suggestion'] = '';
+        }
 
         //compare the current revision to the base branch
         // useful if the dev has changed since deployment
@@ -399,12 +448,19 @@ task('deploy:build_metadata', function (){
         // useful for creating the most common pull requests
         $buildDetails['git_branch_pr_url'] = escapeshellarg("{$repoUrl}/compare/{$compareBase}...{$branch}");
 
+
     }
     else
     {
         //Add a link to the master commits so I can easily calculate the next version number
         $buildDetails['git_master_commits_url'] = escapeshellarg("{$repoUrl}/commits/master");
+
+        //only offer a suggestion if the currently deployed version is not tagged
+        // which implies that it is a release candidate
+        $buildDetails['git_tag_suggestion'] = $tag ? '' : $newTag;
     }
+
+
 
     $launchUrl = has('launch_url') ? get('launch_url'):'';
     if(! empty($launchUrl) )
@@ -427,6 +483,8 @@ task('deploy:build_metadata', function (){
     logger("git revision built: {$rev}");
     logger("See revision in github: {$gitRevUrl}");
     logger("Launch url: {$launchUrl}");
+
+    set('working_path', $lastWorkingPath);
 
 });
 
@@ -964,69 +1022,7 @@ function has_deju_mapped_classes($mappedClasses)
     return false;
 }
 
-task('next:version', function(){
 
-    //change our working path to the release path just for this task
-    // this will ensure our test function can run in a loop correctly
-    $lastWorkingPath = workingPath();
-    $releasePath = get('release_path');
-    set('working_path', $releasePath);
-
-
-    run('{{bin/git}} fetch --tags');
-
-    $branch = get('git_branch');
-    $tag = get('git_tag');
-
-    //if this isn't the master branch or if the tag has a value
-    // leave the function
-    if( ! empty($tag) )
-    {
-        return;
-    }
-
-    //get year/week of todays date
-    $tag = 'v' . date('Y') . '.' . (integer)date('W');
-    $subversion = '';
-
-    //if the tag name we want to use is in conflict with an existing tag
-    while( test("git rev-parse \"{$tag}{$subversion}\" >/dev/null 2>&1") )
-    {
-        //increment a subversion for the tag
-
-        //if the string contains a single dot, it doesn't have a subversion number yet
-        if( preg_match_all('/\./', $tag) === 1 )
-        {
-            //add a period to separate it from the main version
-            $tag .= '.';
-            //and set a start value for the subversion that can be increment each loop
-            $subversion = 1;
-        }
-        else
-        {
-            //increment this subversion to be tested
-            $subversion++;
-        }
-    }
-
-    //add the subversion to the tag
-    $tag .= $subversion;
-
-    if( $branch === 'master')
-    {
-        writeln("This is an untagged master branch deployment.");
-        writeln("Suggested release tag name: {$tag}");
-    }
-    elseif( $branch === 'dev')
-    {
-        writeln("This is an untagged dev branch deployment.");
-        writeln("Suggested base tag name: {$tag}-rc");
-    }
-
-    //set back to the original working path
-    set('working_path', $lastWorkingPath);
-
-});
 
 
 /**
