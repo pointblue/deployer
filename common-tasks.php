@@ -729,10 +729,11 @@ task('deploy:symlink_envs', function(){
     //create a symlink for each target / destination pair
     foreach($envSymlinks as $envSymlink){
 
-        //if the target file we're linking to doesn't exist, throw an error
-        if(! test("[ -f \"{$envSymlink['target']}\" ]"))
+        //if the target file we're linking to doesn't exist,
+        // or if the file size is zero bytes (previous tasks may have use the touch command on it)
+        if(! test("[ -f \"{$envSymlink['target']}\" ]") || ( (integer)run("wc -c test | awk '{print $1}'") === 0))
         {
-            throw new \Exception("the task deploy:symlink_envs is trying to symlink a file that does not exist: {$envSymlink['target']}" );
+            throw new \Exception("the task deploy:symlink_envs is trying to symlink a file that does not exist or it's zero bytes: {$envSymlink['target']}" );
         }
 
         $command = "{{bin/symlink}} {$envSymlink['target']} {$envSymlink['destination']}";
