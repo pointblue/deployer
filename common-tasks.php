@@ -68,8 +68,6 @@ set('keep_releases', 20);
 //the filename of the metadata output for this build. path defaults to project root or `public` folder if available
 set('build_meta_output', 'deployer_php_build.json');
 
-//create this with an empty array to be sure that our function which expecting `common_symlinks` to be set
-set('common_symlinks', []);
 
 //by default, use the origin url defined on the machine deploying this repo
 set('repository', (string)exec('git remote get-url origin'));
@@ -871,6 +869,10 @@ task('deploy:common_symlinks', function(){
     //   link_name is the name of the symbolic link that will be created
     //   current_release_path is the path to the current release of the library
     $libNames = [
+        "deju_common" => [
+            "link_name" => 'deju',
+            "current_release_path" => "{{deploy_path}}/../deju_common/current/deju"
+        ],
         "deju2" => [
             "link_name" => 'deju2',
             "current_release_path" => "{{deploy_path}}/../deju2/current"
@@ -894,6 +896,7 @@ task('deploy:common_symlinks', function(){
         "libs" => []
     ];
 
+    //This section is about the auto-discovery of deju dependencies by inspecting the composer.json file
     $composerFile = "composer.json";
     if(file_exists($composerFile))
     {
@@ -960,10 +963,21 @@ task('deploy:common_symlinks', function(){
     }
 
 
-
-    //common_symlinks is an empty array by default. check if the necessary properties are available to run the function.
-    if(empty($commonSymlinks['base_path']) || count($commonSymlinks['libs']) < 1 )
+    //if a common_symlinks configuration has been set, allow it to override any auto-discovered dependencies
+    if(has('common_symlinks'))
     {
+        $commonSymlinks = get('common_symlinks');
+    }
+
+
+    //check if the necessary properties are available to create the dependency symlinks
+    if(
+        //if the base_path key is not defined, or if it's value is empty
+        ! array_key_exists('base_path', $commonSymlinks) || empty($commonSymlinks['base_path']) ||
+        //if the libs key is not defined, or if the value has a count less than 1
+        ! array_key_exists('libs', $commonSymlinks) || count($commonSymlinks['libs']) < 1 )
+    {
+        //stop running this task, not enough configuration to create symlinks
         return;
     }
 
