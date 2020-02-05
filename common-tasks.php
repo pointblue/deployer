@@ -251,6 +251,22 @@ function has_laravel(){
     return $isLaravel;
 }
 
+function has_cmsms(){
+
+    $includeFile = "include.php";
+    if(file_exists($includeFile))
+    {
+        $contents = file_get_contents($includeFile);
+        return (bool)preg_match('/dev\.cmsmadesimple\.org\/latest_version\.php/', $contents);
+
+    }
+    else
+    {
+        return false;
+    }
+
+}
+
 /**
  *
  *
@@ -260,6 +276,10 @@ function has_laravel(){
  *
  *
  */
+desc('Create necessary temp and cache cmsms directory');
+task('deploy:cmsms_dirs', function(){
+    run('cd {{release_path}} && mkdir -p tmp/cache tmp/templates_c');
+});
 
 
 /**
@@ -1157,12 +1177,24 @@ else
         'deploy:update_code',
         'deploy:shared',
         'deploy:symlink_envs',
-        'deploy:writable',
     ];
 
     //
-    // tasks that are conditional
+    // tasks that are [mostly] conditional
     //
+
+    if(has_cmsms())
+    {
+        //add the task that creates the tmp dirs
+        array_push($taskList, 'deploy:cmsms_dirs');
+        //make sure the paths are writable
+        add('writable_dirs',[
+            "tmp/cache ",
+            "tmp/templates_c"
+        ]);
+    }
+
+    array_push($taskList, 'deploy:writable');
 
     //if the project has a composer.json file, then run the task that calls `composer install`
     if( has_composer_json() )
