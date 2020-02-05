@@ -1018,18 +1018,6 @@ task('deploy:common_symlinks', function(){
     //create the path where the symlinks will go
     run("mkdir -p {$basePath}");
 
-    if(count($libs) > 0)
-    {
-        $message = 'AUTOMATED ACTION EXECUTING: create common_symlinks because composer.json file has references' .
-            ' to at least one deju path ins /apps/common';
-        if(isVerbose() || isVeryVerbose())
-        {
-            writeln($message);
-        }
-
-        logger($message);
-    }
-
     //create a symlink for each lib in the libs array
     for($i=0;$i<count($libs);$i++)
     {
