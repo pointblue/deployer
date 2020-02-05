@@ -835,6 +835,8 @@ task('deploy:symlink_envs', function(){
  * is for libraries that are shared between apps and are deployed in a single location. The main libraries this is meant
  * to support are:
  *
+ *   - apps-authentication-common
+ *   - deju_common
  *   - deju2
  *   - deju2-renew
  *   - deju3
@@ -983,11 +985,19 @@ task('deploy:common_symlinks', function(){
         }
     }
 
-
-    //if a common_symlinks configuration has been set, allow it to override any auto-discovered dependencies
-    if(has('common_symlinks'))
+    //if cmsms and deju.php are together, deploy their common symlinks
+    // this works because i assume we won't have a project with a composer file that has deju reference with a cmsms
+    // site that also uses deju.php
+    if( has_cmsms() && file_exists('deju.php'))
     {
-        $commonSymlinks = get('common_symlinks');
+        $commonSymlinks = [
+            "base_path" => '{{deploy_path}}/releases/common',
+            "libs" => [
+                'deju_common',
+                'apps-authentication-common'
+            ]
+        ];
+
     }
 
 
