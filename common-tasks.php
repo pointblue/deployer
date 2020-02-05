@@ -340,6 +340,7 @@ task('deploy:build_assets', function(){
  *
  *
  */
+//TODO: I think the laravel recipe already does this using the 'writable' array of these same dirs
 desc('Creates default laravel directories needed for laravel app to function');
 task('deploy:create_laravel_dirs', function(){
     run('cd {{release_path}} && mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache bootstrap/cache');
@@ -1195,12 +1196,11 @@ else
     }
 
     array_push($taskList, 'deploy:writable');
+    array_push($taskList, 'deploy:common_symlinks');
 
     //if the project has a composer.json file, then run the task that calls `composer install`
     if( has_composer_json() )
     {
-        echo "Adding deploy:common_symlinks task because composer.json file is present\n";
-        array_push($taskList, 'deploy:common_symlinks');
         echo "Adding deploy:vendors task because composer.json file is present\n";
         array_push($taskList, 'deploy:vendors');
     }
