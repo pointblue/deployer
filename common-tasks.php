@@ -278,7 +278,7 @@ function has_cmsms(){
  */
 desc('Create necessary temp and cache cmsms directory');
 task('deploy:cmsms_dirs', function(){
-    run('cd {{release_path}} && mkdir -p tmp/cache tmp/templates_c');
+    run('cd {{release_path}} && mkdir -p tmp/cache tmp/templates_c deju/templates/templates_c');
 });
 
 
@@ -1196,7 +1196,8 @@ else
         //make sure the paths are writable
         add('writable_dirs',[
             "tmp/cache ",
-            "tmp/templates_c"
+            "tmp/templates_c",
+            "deju/templates/templates_c"
         ]);
     }
 
