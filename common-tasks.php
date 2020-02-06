@@ -813,6 +813,13 @@ task('deploy:symlink_envs', function(){
             throw new \Exception("the task deploy:symlink_envs is trying to symlink a file that does not exist or it's zero bytes: {$envSymlink['target']}" );
         }
 
+        //create the path of the destination if it does not already exist
+        // this allows use to symlink dependencies in the right spot when needed
+        $destinationPath = dirname($envSymlink['destination']);
+        if( ! test("[ -d \"{$destinationPath}\"]") ){
+            run("mkdir -p {$destinationPath}");
+        }
+
         $command = "{{bin/symlink}} {$envSymlink['target']} {$envSymlink['destination']}";
 
         if( input()->getOption('pb-test') ){
