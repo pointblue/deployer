@@ -604,6 +604,14 @@ task('slack:notify', function (){
         "data-test.pointblue.org"=>[
             "name"=>"nonprod-aws",
             "emoji"=>":construction:"
+        ],
+        "nonprod-php56"=>[
+            "name"=>"nonprod-php56",
+            "emoji"=>":construction:"
+        ],
+        "nonprod-php52"=>[
+            "name"=>"nonprod-php52",
+            "emoji"=>":construction:"
         ]
     ];
 
@@ -620,44 +628,46 @@ task('slack:notify', function (){
     }
 
     $repoName = preg_replace('/^(git@github.com:)(.+)\.git$/', '$2', get('repository'));
-
     $revShort = get('git_rev_short');
     $revUrl = get('git_rev_url');
     $repoUrl = get('git_repo_url');
-
-
-    //TODO: For some reason when I use get('host') or get('stage') here, it doesn't work
-    // [RuntimeException] Configuration parameter `stage` does not exists.
     $buildFilename = get('build_meta_output');
+    $server = get('server');
+    $configHost = $server['host'];
+    //if the host in the configuration has an alias, use that. if not, just use the name set in the config
+    $hostName = array_key_exists($configHost, $hostAlias) ? $hostAlias[$configHost]['name'] : $configHost;
+    $hostEmoji = array_key_exists($configHost, $hostAlias) ? $hostAlias[$configHost]['emoji'] : '';
+    $hostShortMsg = " to {$hostName}";
+    $hostLongMsg = " deployed to {$hostName} {$hostEmoji}";
+
+
     if(has('launch_url'))
     {
         $launchUrl = get('launch_url');
-        //only works for .org hosts
-        $launchUrlHost = preg_replace('/^https*:\/\/(.+\.org)\/(.+)/', '$1', $launchUrl);
-        $hostName = array_key_exists($launchUrlHost, $hostAlias) ? $hostAlias[$launchUrlHost]['name'] : $launchUrlHost;
-        $hostEmoji = array_key_exists($launchUrlHost, $hostAlias) ? $hostAlias[$launchUrlHost]['emoji'] : '';
-        $hostShortMsg = " to {$hostName}";
-        $hostLongMsg = " deployed to {$hostName} {$hostEmoji}";
-        $toUrl = "\n>:rocket: <{$launchUrl}|Launch App>";
-        $buildDetailsUrl = "{$launchUrl}/{$buildFilename}";
+        $launchContent = "\n>:rocket: <{$launchUrl}|Launch App>";
+        $buildLink = "^{$launchUrl}/{$buildFilename}";
     }
     else
     {
+        $launchContent = '';
         $buildDetailsUrl = '';
-        $hostShortMsg = '';
-        $hostLongMsg = '';
-        $toUrl = '';
+        $buildLink = '';
     }
 
-    $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} success";
-    $longMessage="deployment success\n><{$repoUrl}|{$repoName}> @ <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$toUrl}";
 
-    $buildDetailsMsg = empty($buildDetailsUrl) ? '': "^{$buildDetailsUrl}";
-    $contextMessage = "*<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}{$buildDetailsMsg}|" .
+    //this is the shorter message preview that users see pop up on their desktop notification
+    $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} success";
+
+    //this is the longer message that gets posted into the channel
+    $longMessage="deployment success\n><{$repoUrl}|{$repoName}> @ <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}{$launchContent}";
+
+    //this is the little footer message at the bottom that shows the date, with an optional link to the build file if available
+    // also provides a link to the deploy revision in github
+    $contextMessage = "*<!date^" . (string)time() . "^Deployed {date_long_pretty} {time_secs}{$buildLink}|" .
         (string)date(DATE_ATOM) . " local build time>* | <{$revUrl}|{$revShort}>"
     ;
 
-
+    //this is the structure that the slack api expects
     $payload = [
         "text"=> $shortMsg,
         "blocks" => [
@@ -680,6 +690,7 @@ task('slack:notify', function (){
         ]
     ];
 
+    //send the notification from the machine that initiated this deployment command
     $curlCommand = "curl -s -X POST -H 'Content-type: application/json' --data '" . json_encode($payload) . "' {$webhookEndpoint}";
     runLocally($curlCommand);
 
