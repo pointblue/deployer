@@ -189,9 +189,6 @@ set('git_rev_url', function (){
     return "{$repoUrl}/tree/{$rev}";
 });
 
-//TODO: Get next suggested version number
-
-
 
 
 /**
@@ -334,23 +331,6 @@ task('deploy:build_assets', function(){
 });
 
 
-/**
- *
- *
- * deploy:create_laravel_dirs
- *
- *
- * Create directories needed by a laravel app.
- *
- *
- */
-//TODO: I think the laravel recipe already does this using the 'writable' array of these same dirs
-desc('Creates default laravel directories needed for laravel app to function');
-task('deploy:create_laravel_dirs', function(){
-    run('cd {{release_path}} && mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache bootstrap/cache');
-});
-
-
 
 /**
  *
@@ -376,7 +356,6 @@ task('deploy:build_metadata', function (){
     //make sure it has the latest tags
     run('{{bin/git}} fetch --tags');
 
-    //TODO: Turn these into functions instead of using config settings to pass the value to other tasks
     //get the revision for the exact commit that's been built
     $rev = get('git_rev');
     $tag = get('git_tag');
@@ -1149,9 +1128,6 @@ if( has_laravel() )
 
     //since the laravel recipe we just included already defines the deploy task, we'll use 'before' and 'after'
     // functions to add tasks in the order we want
-
-    //add a task that creates the required laravel dirs
-    after('deploy:shared', 'deploy:create_laravel_dirs');
 
     //before running the composer install command, create the symlinks that will be needed, if any
     before('deploy:vendors', 'deploy:common_symlinks');
