@@ -268,6 +268,15 @@ function has_cmsms(){
 }
 
 /**
+ * used to detect a project that has cmsms AND deju
+ * @return bool
+ */
+function has_cmsms_deju()
+{
+    return has_cmsms() && file_exists('deju.php');
+}
+
+/**
  *
  *
  * TASKS
@@ -276,11 +285,6 @@ function has_cmsms(){
  *
  *
  */
-desc('Create necessary temp and cache cmsms directory');
-task('deploy:cmsms_dirs', function(){
-    run('cd {{release_path}} && mkdir -p tmp/cache tmp/templates_c deju/templates/templates_c');
-});
-
 
 /**
  *
@@ -1006,7 +1010,7 @@ task('deploy:common_symlinks', function(){
     //if cmsms and deju.php are together, deploy their common symlinks
     // this works because i assume we won't have a project with a composer file that has deju reference with a cmsms
     // site that also uses deju.php
-    if( has_cmsms() && file_exists('deju.php'))
+    if( has_cmsms_deju() )
     {
         $commonSymlinks = [
             "base_path" => '{{deploy_path}}/releases/common',
@@ -1200,15 +1204,20 @@ else
     // tasks that are [mostly] conditional
     //
 
-    if(has_cmsms())
+    if( has_cmsms_deju() )
     {
-        //add the task that creates the tmp dirs
-        array_push($taskList, 'deploy:cmsms_dirs');
+        //add dirs that must persist between deployments
+        add('shared_dirs',[
+            "deju/logs",
+            "uploads",
+        ]);
         //make sure the paths are writable
         add('writable_dirs',[
-            "tmp/cache ",
+            "deju/logs",
+            "deju/templates/templates_c",
+            "tmp/cache",
             "tmp/templates_c",
-            "deju/templates/templates_c"
+            "uploads",
         ]);
     }
 
