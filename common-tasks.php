@@ -685,6 +685,111 @@ task('slack:notify', function (){
 //announcements come after the success task
 after('success', 'slack:notify');
 
+/**
+ *
+ *
+ * # slack:notify_failed
+ *
+ *
+ *
+ * Sends a notification to Slack via a webhook announcing that the build has failed.
+ *
+ *
+ */
+desc('Notify slack of build status');
+task('slack:notify_failed', function (){
+
+    $hostAlias = [
+        "data.pointblue.org"=>[
+            "name"=>"production",
+            "emoji"=>":pointblue:"
+        ],
+        "data3.pointblue.org"=>[
+            "name"=>"old aws",
+            "emoji"=>":construction:"
+        ],
+        "data-test.pointblue.org"=>[
+            "name"=>"nonprod-aws",
+            "emoji"=>":construction:"
+        ],
+        "nonprod-php56"=>[
+            "name"=>"nonprod-php56",
+            "emoji"=>":construction:"
+        ],
+        "nonprod-php52"=>[
+            "name"=>"nonprod-php52",
+            "emoji"=>":construction:"
+        ]
+    ];
+
+    $webhookEndpoint = get('slack_webhook_url');
+    $branch = get('git_branch');
+
+    //cannot complete function without webhook endpoint
+    if(empty($webhookEndpoint))
+    {
+        $longMessage = 'Slack webhook not found (slack_webhook_url). Notification not sent.';
+        writeln($longMessage);
+        logger($longMessage);
+        return;
+    }
+
+    $repoName = preg_replace('/^(git@github.com:)(.+)\.git$/', '$2', get('repository'));
+    $revShort = get('git_rev_short');
+    $revUrl = get('git_rev_url');
+    $repoUrl = get('git_repo_url');
+    $buildFilename = get('build_meta_output');
+    $server = get('server');
+    $configHost = $server['host'];
+    //if the host in the configuration has an alias, use that. if not, just use the name set in the config
+    $hostName = array_key_exists($configHost, $hostAlias) ? $hostAlias[$configHost]['name'] : $configHost;
+    $hostEmoji = array_key_exists($configHost, $hostAlias) ? $hostAlias[$configHost]['emoji'] : '';
+    $hostShortMsg = " to {$hostName}";
+    $hostLongMsg = " did not deploy to {$hostName} {$hostEmoji}";
+
+    //this is the shorter message preview that users see pop up on their desktop notification
+    $shortMsg = "deploy {$repoName} ({$branch}){$hostShortMsg} failed";
+
+    //this is the longer message that gets posted into the channel
+    $longMessage="deployment failed :warning:\n><{$repoUrl}|{$repoName}> @ <{$repoUrl}/tree/{$branch}|{$branch}>{$hostLongMsg}";
+
+    //this is the little footer message at the bottom that shows the date, with an optional link to the build file if available
+    // also provides a link to the deploy revision in github
+    $contextMessage = "*<!date^" . (string)time() . "^{date_long_pretty} {time_secs}|" .
+        (string)date(DATE_ATOM) . " local build time>*"
+    ;
+
+    //this is the structure that the slack api expects
+    $payload = [
+        "text"=> $shortMsg,
+        "blocks" => [
+            [
+                "type" => "section",
+                'text' => [
+                    "type"=> "mrkdwn",
+                    "text" => "$longMessage"
+                ]
+            ],
+            [
+                "type" => "context",
+                "elements" => [
+                    [
+                        "type" => "mrkdwn",
+                        "text" => $contextMessage
+                    ]
+                ]
+            ]
+        ]
+    ];
+
+    //send the notification from the machine that initiated this deployment command
+    $curlCommand = "curl -s -X POST -H 'Content-type: application/json' --data '" . json_encode($payload) . "' {$webhookEndpoint}";
+    runLocally($curlCommand);
+
+});
+//announcements come after the success task
+after('deploy:failed', 'slack:notify_failed');
+
 
 /**
  *
