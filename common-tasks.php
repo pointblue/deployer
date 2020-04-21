@@ -478,7 +478,10 @@ task('deploy:build_metadata', function (){
 
 
     //write the json contents to the output file
-    run("echo '" . $content . "' > {$outputFile}");
+    run("echo '{$content}' > {$outputFile}");
+
+    //write the json contents to the local dir it was deployed from
+    runLocally("echo '{$content}' > ./{$filename}");
 
 
     //log the reference
