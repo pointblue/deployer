@@ -1212,7 +1212,9 @@ task('deploy:pb_deployer_post_hook_laravel', [
  *
  */
 desc('DEPRECATED - Common Point Blue deployer tasks to run just before releasing the app');
-task('deploy:pb_deployer_post_hook', []);
+task('deploy:pb_deployer_post_hook', function(){
+    //noop
+});
 
 
 
@@ -1336,6 +1338,7 @@ else
     //merge tasks that have to run last to the end of the task list
     task('deploy', array_merge($taskList, [
         'deploy:clear_paths',
+        'deploy:pb_deployer_post_hook',
         'deploy:symlink',
         'deploy:unlock',
         'cleanup',
