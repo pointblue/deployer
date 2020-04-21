@@ -492,6 +492,7 @@ task('deploy:build_metadata', function (){
     set('working_path', $lastWorkingPath);
 
 });
+after('success', 'deploy:build_metadata');
 
 /**
  *
@@ -1097,16 +1098,16 @@ task('deploy:pb_deployer_post_hook_laravel', [
 ]);
 
 /**
+ * DEPRECATED
+ *
  * Tasks we want to do every time for all app deployments
  *
  * Run after deploy:clear_paths task for apps *with out* laravel recipe
  * Run after artisan:optimize task for apps with laravel recipe
  *
  */
-desc('Common Point Blue deployer tasks to run just before releasing the app');
-task('deploy:pb_deployer_post_hook', [
-    'deploy:build_metadata'
-]);
+desc('DEPRECATED - Common Point Blue deployer tasks to run just before releasing the app');
+task('deploy:pb_deployer_post_hook', []);
 
 
 
@@ -1138,9 +1139,6 @@ if( has_laravel() )
     //.env symlinks must be created before composer caches the config files
     // otherwise, nothing will be cached and the app will fail to run
     before('artisan:config:cache', 'deploy:symlink_envs');
-
-    //the artisan:optimize task is last before changing this release to the current release.
-    after('artisan:optimize', 'deploy:pb_deployer_post_hook');
 
     //
     // tasks that are conditional
@@ -1233,7 +1231,6 @@ else
     //merge tasks that have to run last to the end of the task list
     task('deploy', array_merge($taskList, [
         'deploy:clear_paths',
-        'deploy:pb_deployer_post_hook',
         'deploy:symlink',
         'deploy:unlock',
         'cleanup',
