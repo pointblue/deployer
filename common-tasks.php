@@ -1149,8 +1149,39 @@ task('deploy:common_symlinks', function(){
 
 });
 
+desc('forces to docker deploy folder to be owned by the www-data user/group. *nonprod-php52 bug fix');
+//meant to patch a "bug" with php 5.2 environment
+task('deploy:fix_docker_permissions', function(){
+
+    if( has_php52_host() ){
+        //forces docker server to have www-data as owner/group of code deploy folder
+        run('sudo docker exec -it 878aa7399781 sh -c "chown www-data:www-data -R /point_blue/deploy/"');
+    }
+
+});
+
+
+desc('forces to deploy folder to be owned by the deployer user/group. *nonprod-php52 bug fix');
+/**
+ * our nonprod-php52 server has a permissions error that we're patching here. it's not a great solution but
+ * we can't figure out why the permissions reset themselves since we started running docker.
+ */
+task('deploy:fix_deploy_folder_permissions', function(){
+
+    if( has_php52_host() ){
+        //forces server to have deployer as owner/group of code deploy folder
+        run('sudo chown deployer:deployer -R /point_blue/deploy/');
+    }
+
+});
+
 task('debug:say_hello', function(){
     writeln('hello, world!');
+});
+
+task('debug:has_php52_host', function(){
+    $server = has_php52_host();
+    var_dump($server);
 });
 
 function has_deju_mapped_classes($mappedClasses)
@@ -1169,10 +1200,16 @@ function has_deju_mapped_classes($mappedClasses)
     return false;
 }
 
+/**
+ * this function only works when used in a task() anonymous function
+ * @return bool
+ */
 function has_php52_host()
 {
-    $host = get('host');
-    //TODO: Find the substring 'php52' in the host; return true if found, otherwise false
+    $server = get('server');
+
+    //if the host name contains 'php52', return true. otherwise false
+    return strpos( $server['host'], 'php52' ) !== FALSE ? TRUE : FALSE;
 }
 
 
@@ -1286,6 +1323,7 @@ else
 {
     //tasks that must run first, for all non-laravel deployments
     $taskList = [
+        'deploy:fix_deploy_folder_permissions',
         'deploy:prepare',
         'deploy:lock',
         'deploy:release',
@@ -1349,6 +1387,7 @@ else
     task('deploy', array_merge($taskList, [
         'deploy:clear_paths',
         'deploy:pb_deployer_post_hook',
+        'deploy:fix_docker_permissions',
         'deploy:symlink',
         'deploy:unlock',
         'cleanup',
