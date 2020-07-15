@@ -66,6 +66,20 @@ Some additional variables can be added to your hosts definition in the `servers.
 `env_symlinks` - see `deploy:symlink_envs` in `common-tasks.php`  
 `update_autoload_classmap` - see `deploy:update_autoload_classmap` in `common-tasks.php`
 
+## Development  
+
+Notes on developing this project.
+
+It's best to symlink this project from your global composer path. This way your edits can be tested right away.  
+
+This is how I used a symlink on my system:  
+```
+martin@lat3351:~/.config/composer/vendor/pointblue$ ln -sf /home/martin/Workspace/devops/devenv/deployer deployer
+```
+
+This allows the `require 'pointblue/deployer/common-tasks.php';` line in `deploy.php` to refer to the pointblue/deployer
+repo I cloned. Now my edits are under source control and can be tested lived.  
+
 
 ## Reference  
 
