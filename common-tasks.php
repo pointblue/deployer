@@ -1149,6 +1149,10 @@ task('deploy:common_symlinks', function(){
 
 });
 
+task('debug:say_hello', function(){
+    writeln('hello, world!');
+});
+
 function has_deju_mapped_classes($mappedClasses)
 {
     for($i=0;$i<count($mappedClasses);$i++)
@@ -1163,6 +1167,12 @@ function has_deju_mapped_classes($mappedClasses)
     }
 
     return false;
+}
+
+function has_php52_host()
+{
+    $host = get('host');
+    //TODO: Find the substring 'php52' in the host; return true if found, otherwise false
 }
 
 
