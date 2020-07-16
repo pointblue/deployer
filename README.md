@@ -8,6 +8,8 @@ This will install the package globally
 
 `composer global require pointblue/deployer`  
 
+This package is available from packagist - [https://packagist.org/packages/pointblue/deployer](https://packagist.org/packages/pointblue/deployer)
+
 ### Configuration  
 
   1. Edit the `php.ini` for your command line environment at `/etc/php/VERSION/cli/php.ini` where 
