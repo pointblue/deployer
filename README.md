@@ -66,6 +66,34 @@ Some additional variables can be added to your hosts definition in the `servers.
 `env_symlinks` - see `deploy:symlink_envs` in `common-tasks.php`  
 `update_autoload_classmap` - see `deploy:update_autoload_classmap` in `common-tasks.php`
 
+## Development  
+
+Notes on developing this project.
+
+### Symlink to global composer path (optional)
+
+It's best to symlink this project from your global composer path. This way your edits can be tested right away.  
+
+This is how I used a symlink on my system:  
+```
+martin@lat3351:~/.config/composer/vendor/pointblue$ ln -sf /home/martin/Workspace/devops/devenv/deployer deployer
+```
+
+This allows the `require 'pointblue/deployer/common-tasks.php';` line in `deploy.php` to refer to the pointblue/deployer
+repo I cloned. Now my edits are under source control and can be tested lived.  
+
+### Use debug tasks  
+
+You can run debug tasks from you machine to see how individual functions behave and drop break points.  
+
+  - From the command line, go to a locally cloned repo that uses common-tasks.php in it's deploy.php file
+  - Run `dep debug:say_hello prod` where `prod` is any target machine you can deploy to (from your current command line)
+  - You should be able to see 'hello, world!' printed in your console
+  - You should also be able to set a breakpoint on this line in PHPStorm
+  - Use this pattern to create more debug tasks
+  
+
+
 
 ## Reference  
 
