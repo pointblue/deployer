@@ -1155,7 +1155,7 @@ task('deploy:fix_docker_permissions', function(){
 
     if( has_php52_host() ){
         //forces docker server to have www-data as owner/group of code deploy folder
-        run('sudo docker exec -it 878aa7399781 sh -c "chown www-data:www-data -R /point_blue/deploy/"');
+        run('sudo docker exec 878aa7399781 sh -c "chown www-data:www-data -R /point_blue/deploy/"');
     }
 
 });
