@@ -51,8 +51,8 @@ set('use_relative_symlink', false);
 //log all actions to a local file
 set('log_file', 'deployer_php_build.log');
 
-//keeping a large number of releases allows us to safely do a large number of test deployments
-set('keep_releases', 20);
+//keep a limited number of release to balance the ability to rollback and the amount of store space used for deployments
+set('keep_releases', 5);
 
 /**
  *
